@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Application xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Name="fabric:/Exchange" xmlns="http://schemas.microsoft.com/2011/01/fabric">
+  <Parameters>
+    <Parameter Name="Fulfillment_PartitionCount" Value="1" />
+    <Parameter Name="Fulfillment_MinReplicaSetSize" Value="3" />
+    <Parameter Name="Fulfillment_TargetReplicaSetSize" Value="3" />
+    <Parameter Name="Fulfillment_DnsName" Value="fulfillment.exchange" />
+    <Parameter Name="Fulfillment_Port" Value="8080" />
+    <Parameter Name="OrderBook_PartitionCount" Value="1" />
+    <Parameter Name="OrderBook_MinReplicaSetSize" Value="3" />
+    <Parameter Name="OrderBook_TargetReplicaSetSize" Value="3" />
+  </Parameters>
+</Application>
