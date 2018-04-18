@@ -11,9 +11,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "Common\Common.csp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Fulfillment", "Fulfillment\Fulfillment.csproj", "{48D002C9-5961-4D87-A600-16F4260969E7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Fulfillment.Tests", "Fulfillment.Tests\Fulfillment.Tests.csproj", "{AD27D37E-716C-4937-AED1-F601A9720DDA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Fulfillment.Tests", "Fulfillment.Tests\Fulfillment.Tests.csproj", "{AD27D37E-716C-4937-AED1-F601A9720DDA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrderBook.Tests", "OrderBook.Tests\OrderBook.Tests.csproj", "{01DE56BA-B457-4651-8E5C-1419F2726880}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrderBook.Tests", "OrderBook.Tests\OrderBook.Tests.csproj", "{01DE56BA-B457-4651-8E5C-1419F2726880}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1663AAED-B8F8-44A9-99FC-DC22F2790BBC}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

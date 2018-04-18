@@ -53,6 +53,7 @@ namespace OrderBook
         /// <returns></returns>
         public async Task AddAskAsync(Order order)
         {
+            IsValidOrder(order);
             await this.asks.AddOrderAsync(order);
         }
 
@@ -124,8 +125,8 @@ namespace OrderBook
         protected override async Task RunAsync(CancellationToken cancellationToken)
         {
             var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
-            var dnsName = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["ServiceDnsName"];
-            var port = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["servicePort"];
+            var dnsName = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["ServiceDnsName"].Value;
+            var port = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["servicePort"].Value;
 
             fulfillmentEndpoint = $"http://{dnsName}:{port}";
 
@@ -151,23 +152,43 @@ namespace OrderBook
                         ServiceEventSource.Current.ServiceMessage(this.Context, "No asks available");
                         continue;
                     }
-                    if (maxBid.Value >= minAsk.Value)
+                    if ((maxBid.Value >= minAsk.Value) && (maxBid.Quantity <= minAsk.Quantity))
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"Match made for {maxBid.Quantity} at price {maxBid.Value}");
+                        (var matchingAsk, var leftOverAsk) = SplitAsk(maxBid, minAsk);
+                        if (leftOverAsk != null)
+                        {
+                            await AddAskAsync(leftOverAsk);
+                        }
+
                         using (var tx = this.StateManager.CreateTransaction())
                         {
-                            await this.asks.ResolveOrderAsync(tx, minAsk);
+                            await this.asks.ResolveOrderAsync(tx, matchingAsk);
                             await this.bids.ResolveOrderAsync(tx, maxBid);
 
-                            var match = new TransferRequestModel();
+                            var match = new TransferRequestModel
+                            {
+                                Ask = matchingAsk,
+                                Bid = maxBid,
+                            };
                             var content = new StringContent(JsonConvert.SerializeObject(match), Encoding.UTF8, "application/json");
                             try
                             {
-                                var res = await client.PostAsync($"{fulfillmentEndpoint}/api/transfers", content);
+                                var addTransferUri = $"{fulfillmentEndpoint}/api/transfers";
+#if DEBUG
+                                addTransferUri = $"http://localhost:{port}/api/transfers";
+#endif
+                                var res = await client.PostAsync(addTransferUri, content);
                                 if (res.IsSuccessStatusCode)
                                 {
-                                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Created new transfer with id '{res.Content.ToString()}'");
+                                    var transferId = await res.Content.ReadAsStringAsync();
+                                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Created new transfer with id '{transferId}'");
                                     await tx.CommitAsync();
+                                }
+                                else if (res.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
+                                {
+                                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Failed to contact the fulfillment service, is it running?");
+                                    tx.Abort();
                                 }
                                 else
                                 {
@@ -184,11 +205,67 @@ namespace OrderBook
                         }
                     }
                 }
-                catch (Exception ex)
+                catch (InvalidOrderException ex)
                 {
-                    ServiceEventSource.Current.Message($"Exception thrown evaluating transfer: {ex.Message}");
+                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid order matched, this shouldn't happen");
                     throw ex;
                 }
+                catch (Exception ex)
+                {
+                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Exception thrown evaluating transfer: {ex.Message}");
+                    throw ex;
+                }
+            }
+        }
+
+        public (Order, Order) SplitAsk(Order bid, Order ask)
+        {
+            if (ask.Quantity == 0 || ask.Value == 0)
+            {
+                throw new InvalidOrderException("Ask quantity or value cannot be 0");
+            }
+            if (bid.Quantity == 0 || bid.Value == 0)
+            {
+                throw new InvalidOrderException("Bid quantity or value cannot be 0");
+            }
+            if (bid.Value == ask.Value && bid.Quantity == ask.Quantity)
+            {
+                return (ask, null);
+            }
+            
+            var leftOverQuantity = ask.Quantity - bid.Quantity;
+            var unitValue = (float)ask.Value / (float)ask.Quantity;
+            var leftOverValue = unitValue * leftOverQuantity;
+            var leftOverAsk = new Order
+            {
+                Quantity = leftOverQuantity,
+                Value = (uint)Math.Floor(leftOverValue),
+            };
+            var match = new Order(ask.Id)
+            {
+                Quantity = bid.Quantity,
+                Value = bid.Value,
+            };
+            return (match, leftOverAsk);
+        }
+
+        private void IsValidOrder(Order order)
+        {
+            if (string.IsNullOrWhiteSpace(order.Id))
+            {
+                throw new InvalidOrderException("Order Id cannot be null, empty or contain whitespace");
+            }
+            if (string.IsNullOrWhiteSpace(order.UserId))
+            {
+                throw new InvalidOrderException("Order cannot have a null or invalid user id");
+            }
+            if (order.Quantity == 0)
+            {
+                throw new InvalidOrderException("Order cannot have 0 quantity");
+            }
+            if (order.Value == 0)
+            {
+                throw new InvalidOrderException("Order cannot have 0 value");
             }
         }
     }

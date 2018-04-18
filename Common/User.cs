@@ -64,7 +64,7 @@ namespace Common
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
             if (obj.GetType() != obj.GetType()) return false;
-            return Equals(obj as Transfer);
+            return Equals(obj as User);
         }
     }
 }

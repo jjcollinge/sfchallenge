@@ -98,6 +98,8 @@ namespace Fulfillment
         {
             while (true)
             {
+                // Respect the cancellation token so that the Service Fabric
+                // runtime can kill us properly.
                 cancellationToken.ThrowIfCancellationRequested();
 
 #if DEBUG
@@ -158,7 +160,7 @@ namespace Fulfillment
         {
             if (string.IsNullOrWhiteSpace(user.Username))
             {
-                throw new InvalidUserRequestException("Username cannot be null, empty or contain whitespace");
+                throw new InvalidTransferRequestException("Username cannot be null, empty or contain whitespace");
             }
         }
 

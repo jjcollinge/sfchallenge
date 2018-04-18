@@ -12,6 +12,11 @@ namespace Common
             this.Id = Guid.NewGuid().ToString();
         }
 
+        public Order(string id)
+        {
+            this.Id = id;
+        }
+
         public string Id { get; }
         public string UserId { get; set; }
         public uint Value { get; set; }

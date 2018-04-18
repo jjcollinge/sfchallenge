@@ -51,6 +51,10 @@ namespace OrderBook.Controllers
                 var bids = await this.orderBook.GetBidsAsync();
                 return this.Json(bids);
             }
+            catch (InvalidOrderException ex)
+            {
+                return new ContentResult { StatusCode = 400, Content = ex.Message };
+            }
             catch (Exception)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
@@ -76,14 +80,14 @@ namespace OrderBook.Controllers
         [HttpPost]
         public async Task<IActionResult> Bid([FromBody] Order order)
         {
-            if (!IsValidOrder(order))
-            {
-                return this.BadRequest("order is not valid");
-            }
             try
             {
                 await this.orderBook.AddBidAsync(order);
                 return this.Ok(order.Id);
+            }
+            catch (InvalidOrderException ex)
+            {
+                return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
             catch (FabricNotPrimaryException)
             {
@@ -99,14 +103,14 @@ namespace OrderBook.Controllers
         [HttpPost]
         public async Task<IActionResult> Ask([FromBody] Order order)
         {
-            if(!IsValidOrder(order))
-            {
-                return this.BadRequest("order is not valid");
-            }
             try
             {
                 await this.orderBook.AddAskAsync(order);
                 return this.Ok(order.Id);
+            }
+            catch (InvalidOrderException ex)
+            {
+                return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
             catch (FabricNotPrimaryException)
             {
@@ -116,23 +120,6 @@ namespace OrderBook.Controllers
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
-        }
-
-        private static bool IsValidOrder(Order order)
-        {
-            if (order.UserId == default(string))
-            {
-                return false;
-            }
-            if (order.Quantity < 0)
-            {
-                return false;
-            }
-            if (order.Value < 0)
-            {
-                return false;
-            }
-            return true;
         }
     }
 }

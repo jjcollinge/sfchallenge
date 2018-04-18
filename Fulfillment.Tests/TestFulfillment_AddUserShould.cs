@@ -35,5 +35,25 @@ namespace Fulfillment.Tests
             var actual = (await users.Value.TryGetValueAsync(new MockTransaction(stateManager, 1), userId)).Value;
             Assert.Equal(expected, actual);
         }
+
+        [Fact]
+        public async Task ThrowIfUsernameIsNullOrWhitespace()
+        {
+            var context = MockStatefulServiceContextFactory.Default;
+            var stateManager = new MockReliableStateManager();
+            var service = new Fulfillment(context, stateManager);
+
+            var qty = (uint)100;
+            var balance = (uint)100;
+            var username = "  ";
+            var request = new UserRequestModel
+            {
+                Quantity = qty,
+                Balance = balance,
+                Username = username,
+            };
+
+            await Assert.ThrowsAsync<InvalidTransferRequestException>(() => service.AddUserAsync(request));
+        }
     }
 }

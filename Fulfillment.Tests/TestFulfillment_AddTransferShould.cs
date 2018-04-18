@@ -68,7 +68,7 @@ namespace Fulfillment.Tests
                 Bid = bid,
             };
 
-            Assert.ThrowsAsync<InvalidTransferRequestException>(() => service.AddTransferAsync(request));
+            await Assert.ThrowsAsync<InvalidTransferRequestException>(() => service.AddTransferAsync(request));
         }
 
         [Fact]
@@ -96,7 +96,7 @@ namespace Fulfillment.Tests
                 Bid = bid,
             };
 
-            Assert.ThrowsAsync<InvalidTransferRequestException>(() => service.AddTransferAsync(request));
+            await Assert.ThrowsAsync<InvalidTransferRequestException>(() => service.AddTransferAsync(request));
         }
     }
 }
