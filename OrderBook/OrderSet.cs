@@ -23,7 +23,10 @@ namespace OrderBook
     {
         private string setName = "";
         private IReliableStateManager stateManager;
-        private SortedSet<int> secondaryIndex; // Used to keep an ordered reference of the dictionary keys
+
+        // Used to keep an ordered reference of the dictionary keys.
+        // Stores keys in ascending order.
+        private SortedSet<int> secondaryIndex;
 
         public OrderSet(IReliableStateManager stateManager, string setName)
         {
@@ -102,8 +105,8 @@ namespace OrderBook
 
         /// <summary>
         /// Gets the maximum key from the ordered secondary
-        /// index and then attempts to peek the first order
-        /// in it's order queue.
+        /// index and then attempts to peek the last order
+        /// in its order queue.
         /// </summary>
         /// <returns></returns>
         public async Task<Order> PeekMaxOrderAsync()
@@ -119,7 +122,7 @@ namespace OrderBook
         /// <summary>
         /// Gets the minimum key from the ordered secondary
         /// index and then attempts to peek the first order
-        /// in it's order queue.
+        /// in its order queue.
         /// </summary>
         /// <returns></returns>
         public async Task<Order> PeekMinOrderAsync()
