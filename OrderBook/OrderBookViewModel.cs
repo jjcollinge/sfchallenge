@@ -15,6 +15,8 @@ namespace OrderBook
 
         public List<KeyValuePair<int, Queue<Order>>> Asks { get; set; }
         public List<KeyValuePair<int, Queue<Order>>> Bids { get; set; }
+        public int AsksCount { get; set; }
+        public int BidsCount { get; set; }
         public DateTime Timestamp { get; }
     }
 }

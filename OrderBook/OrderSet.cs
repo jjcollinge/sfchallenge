@@ -108,7 +108,7 @@ namespace OrderBook
         /// <returns></returns>
         public async Task<Order> PeekMaxOrderAsync()
         {
-            var maxKey = this.secondaryIndex.FirstOrDefault();
+            var maxKey = this.secondaryIndex.LastOrDefault();
             if (maxKey == default(int))
             {
                 return null;
@@ -205,6 +205,39 @@ namespace OrderBook
                 await tx.CommitAsync();
             }
             return order;
+        }
+
+        /// <summary>
+        /// Gets the queue depth for a given key
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public async Task<int> GetCountForKey(int key)
+        {
+            IReliableDictionary<int, Queue<Order>> orders =
+                await this.stateManager.GetOrAddAsync<IReliableDictionary<int, Queue<Order>>>(this.setName);
+
+            int depth;
+            using (ITransaction tx = this.stateManager.CreateTransaction())
+            {
+                if (!await orders.ContainsKeyAsync(tx, key))
+                {
+                    throw new Exception($"Desired key '{key}' does not exist in dictionary");
+                }
+
+                var tryValue = await orders.TryGetValueAsync(tx, key);
+                if (tryValue.HasValue)
+                {
+                    var value = tryValue.Value;
+                    depth = value.Count;
+                }
+                else
+                {
+                    throw new Exception($"key '{key}' exists but failed to get it");
+                }
+                await tx.CommitAsync();
+            }
+            return depth;
         }
 
         /// <summary>

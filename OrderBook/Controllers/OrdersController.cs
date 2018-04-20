@@ -30,9 +30,13 @@ namespace OrderBook.Controllers
             {
                 var asks = await this.orderBook.GetAsksAsync();
                 var bids = await this.orderBook.GetBidsAsync();
+                var asksCount = await this.orderBook.GetAsksCountAsync();
+                var bidsCount = await this.orderBook.GetBidsCountAsync();
                 var view = new OrderBookViewModel {
                     Asks = asks,
                     Bids = bids,
+                    AsksCount = asksCount,
+                    BidsCount = bidsCount,
                 };
                 return this.Json(view);
             }
