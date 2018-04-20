@@ -86,6 +86,56 @@ namespace OrderBook
         }
 
         /// <summary>
+        /// Returns the total number of asks
+        /// </summary>
+        /// <returns></returns>
+        public async Task<int> GetAsksCountAsync()
+        {
+            var asks = await this.GetAsksAsync();
+            var totalCount = 0;
+            foreach (var ask in asks)
+            {
+                totalCount += await this.asks.GetCountForKey(ask.Key);
+            }
+            return totalCount;
+        }
+
+        /// <summary>
+        /// Returns the total number of bids
+        /// </summary>
+        /// <returns></returns>
+        public async Task<int> GetBidsCountAsync()
+        {
+            var bids = await this.GetBidsAsync();
+            var totalCount = 0;
+            foreach (var bid in bids)
+            {
+                totalCount += await this.bids.GetCountForKey(bid.Key);
+            }
+            return totalCount;
+        }
+
+        /// <summary>
+        /// Returns the number of asks for a given value
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public async Task<int> GetAsksCountForValueAsync(int value)
+        {
+            return await this.asks.GetCountForKey(value);
+        }
+
+        /// <summary>
+        /// Returns the number of bids for a given value
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public async Task<int> GetBidsCountForValueAsync(int value)
+        {
+            return await this.bids.GetCountForKey(value);
+        }
+
+        /// <summary>
         /// Optional override to create listeners (like tcp, http) for this service instance.
         /// </summary>
         /// <returns>The collection of listeners.</returns>
@@ -152,7 +202,7 @@ namespace OrderBook
                         ServiceEventSource.Current.ServiceMessage(this.Context, "No asks available");
                         continue;
                     }
-                    if ((maxBid.Value >= minAsk.Value) && (maxBid.Quantity <= minAsk.Quantity))
+                    if (IsMatch(maxBid, minAsk))
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"Match made for {maxBid.Quantity} at price {maxBid.Value}");
                         (var matchingAsk, var leftOverAsk) = SplitAsk(maxBid, minAsk);
@@ -218,6 +268,11 @@ namespace OrderBook
             }
         }
 
+        private static bool IsMatch(Order maxBid, Order minAsk)
+        {
+            return (maxBid.Value >= minAsk.Value) && (maxBid.Quantity <= minAsk.Quantity);
+        }
+
         public (Order, Order) SplitAsk(Order bid, Order ask)
         {
             if (ask.Quantity == 0 || ask.Value == 0)
@@ -228,7 +283,7 @@ namespace OrderBook
             {
                 throw new InvalidOrderException("Bid quantity or value cannot be 0");
             }
-            if (bid.Value == ask.Value && bid.Quantity == ask.Quantity)
+            if (ask.Quantity == bid.Quantity)
             {
                 return (ask, null);
             }
@@ -240,11 +295,13 @@ namespace OrderBook
             {
                 Quantity = leftOverQuantity,
                 Value = (uint)Math.Floor(leftOverValue),
+                UserId = ask.UserId,
             };
             var match = new Order(ask.Id)
             {
                 Quantity = bid.Quantity,
                 Value = bid.Value,
+                UserId = ask.UserId,
             };
             return (match, leftOverAsk);
         }
