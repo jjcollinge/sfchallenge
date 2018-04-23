@@ -17,22 +17,15 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order
-            {
-                UserId = "user1",
-                Quantity = 100,
-                Value = 100,
-            };
-            var bid = new Order
-            {
-                UserId = "user2",
-                Quantity = 50,
-                Value = 60,
-            };
-
+            var askQuantity = 100;
+            var askValue = 100;
+            var ask = new Order("user1", askValue, askQuantity, string.Empty);
+            var bid = new Order("user2", askValue + 10, askQuantity/2, string.Empty);
             (var match, var leftOver) = service.SplitAsk(bid, ask);
-            Assert.True(ask.Value <= (match.Value + leftOver.Value));
-            Assert.Equal((match.Quantity + leftOver.Quantity), ask.Quantity);
+            Assert.True(match.Value == bid.Value);
+            Assert.True(match.Quantity == bid.Quantity);
+            Assert.True(leftOver.Quantity == (ask.Quantity - bid.Quantity));
+            Assert.True(leftOver.Value == ask.Value);
         }
 
         [Fact]
@@ -42,22 +35,14 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order
-            {
-                UserId = "user1",
-                Quantity = 100,
-                Value = 100,
-            };
-            var bid = new Order
-            {
-                UserId = "user2",
-                Quantity = 100,
-                Value = 150,
-            };
+            var askQuantity = 100;
+            var askValue = 100;
+            var ask = new Order("user1", askValue, askQuantity, string.Empty);
+            var bid = new Order("user2", 100, 150, string.Empty);
 
-            var spread = bid.Value - ask.Value;
+            var spread = bid.Value - askValue;
             (var match, var leftOver) = service.SplitAsk(bid, ask);
-            Assert.Equal(ask.Value + spread, match.Value + leftOver.Value);
+            Assert.Equal(askValue + spread, match.Value);
         }
 
         [Fact]
@@ -67,18 +52,8 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order
-            {
-                UserId = "user1",
-                Quantity = 100,
-                Value = 100,
-            };
-            var bid = new Order
-            {
-                UserId = "user2",
-                Quantity = 100,
-                Value = 100,
-            };
+            var ask = new Order("user1", 100, 100, string.Empty);
+            var bid = new Order("user2", 100, 100, string.Empty);
 
             var spread = bid.Value - ask.Value;
             (var match, var leftOver) = service.SplitAsk(bid, ask);
@@ -93,20 +68,9 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order
-            {
-                UserId = "user1",
-                Quantity = 100,
-                Value = 100,
-            };
-            var bid = new Order
-            {
-                UserId = "user2",
-                Quantity = 100,
-                Value = 0,
-            };
-
-            Assert.Throws<InvalidOrderException>(() => service.SplitAsk(bid, ask));
+            var ask = new Order("user1", 100, 100, string.Empty);
+            var bid = new Order("user2", 100, 0, string.Empty);
+            Assert.Throws<InvalidBidException>(() => service.SplitAsk(bid, ask));
         }
 
         [Fact]
@@ -116,20 +80,9 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order
-            {
-                UserId = "user1",
-                Quantity = 100,
-                Value = 0,
-            };
-            var bid = new Order
-            {
-                UserId = "user2",
-                Quantity = 100,
-                Value = 100,
-            };
-
-            Assert.Throws<InvalidOrderException>(() => service.SplitAsk(bid, ask));
+            var ask = new Order("user1", 100, 0, string.Empty);
+            var bid = new Order("user2", 100, 100, string.Empty);
+            Assert.Throws<InvalidAskException>(() => service.SplitAsk(bid, ask));
         }
     }
 }

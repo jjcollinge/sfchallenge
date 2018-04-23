@@ -20,14 +20,14 @@ namespace Fulfillment.Controllers
 
         // POST api/transfers
         [HttpPost]
-        public async Task<IActionResult> PostAsync([FromBody]TransferRequestModel transferRequest)
+        public async Task<IActionResult> PostAsync([FromBody] TransferRequestModel transferRequest)
         {
             try
             {
                 var transferId = await this.fulfillment.AddTransferAsync(transferRequest);
                 return this.Ok(transferId);
             }
-            catch (InvalidUserRequestException ex)
+            catch (InvalidTransferRequestException ex)
             {
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
@@ -35,6 +35,13 @@ namespace Fulfillment.Controllers
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAsync()
+        {
+            var count = await this.fulfillment.GetTransfersCountAsync();
+            return this.Ok(count);
         }
     }
 }

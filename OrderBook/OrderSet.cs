@@ -4,6 +4,7 @@ using Microsoft.ServiceFabric.Data.Collections;
 using Microsoft.ServiceFabric.Data.Notifications;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,12 +13,9 @@ namespace OrderBook
 {
     /// <summary>
     /// An OrderSet keeps track of a set of orders using a reliable dictionary.
-    /// It uses the order value as a key and a generic C# queue of orders as 
-    /// a value. It then uses a secondary index to keep track of the ordering
-    /// of the dictionary keys. This allows us to achieve price-time ordering
-    /// across our orders.
-    /// We can select the maximum or minimum value order queue and then pop
-    /// off the oldest order at that amount.
+    /// It uses a secondary index to keep track of the ordering of the 
+    /// dictionary keys. This allows us to select the maximum or minimum value
+    /// orders.
     /// </summary>
     public class OrderSet
     {
@@ -26,14 +24,16 @@ namespace OrderBook
 
         // Used to keep an ordered reference of the dictionary keys.
         // Stores keys in ascending order.
-        private SortedSet<int> secondaryIndex;
+        // Note: This is public for testing purposes as the required
+        // mock reliable collection notifications are not implemented.
+        public SortedSet<Order> SecondaryIndex;
 
         public OrderSet(IReliableStateManager stateManager, string setName)
         {
+            this.SecondaryIndex = new SortedSet<Order>();
+
             this.stateManager = stateManager;
             this.setName = setName;
-            this.secondaryIndex = new SortedSet<int>();
-
             this.stateManager.StateManagerChanged += this.OnStateManagerChangedHandler;
         }
 
@@ -43,21 +43,21 @@ namespace OrderBook
         /// pairs.
         /// </summary>
         /// <returns></returns>
-        public async Task<List<KeyValuePair<int, Queue<Order>>>> GetOrdersAsync()
+        public async Task<List<KeyValuePair<string, Order>>> GetOrdersAsync()
         {
-            List<KeyValuePair<int, Queue<Order>>> result = new List<KeyValuePair<int, Queue<Order>>>();
+            List<KeyValuePair<string, Order>> result = new List<KeyValuePair<string, Order>>();
 
-            ConditionalValue<IReliableDictionary<int, Queue<Order>>> conditionResult =
-                await this.stateManager.TryGetAsync<IReliableDictionary<int, Queue<Order>>>(this.setName);
+            ConditionalValue<IReliableDictionary<string, Order>> conditionResult =
+                await this.stateManager.TryGetAsync<IReliableDictionary<string, Order>>(this.setName);
 
             if (conditionResult.HasValue)
             {
-                IReliableDictionary<int, Queue<Order>> orders = conditionResult.Value;
+                IReliableDictionary<string, Order> orders = conditionResult.Value;
 
                 using (var tx = this.stateManager.CreateTransaction())
                 {
-                    Microsoft.ServiceFabric.Data.IAsyncEnumerable<KeyValuePair<int, Queue<Order>>> enumerable = await orders.CreateEnumerableAsync(tx);
-                    Microsoft.ServiceFabric.Data.IAsyncEnumerator<KeyValuePair<int, Queue<Order>>> enumerator = enumerable.GetAsyncEnumerator();
+                    Microsoft.ServiceFabric.Data.IAsyncEnumerable<KeyValuePair<string, Order>> enumerable = await orders.CreateEnumerableAsync(tx);
+                    Microsoft.ServiceFabric.Data.IAsyncEnumerator<KeyValuePair<string, Order>> enumerator = enumerable.GetAsyncEnumerator();
 
                     while (await enumerator.MoveNextAsync(CancellationToken.None))
                     {
@@ -70,140 +70,56 @@ namespace OrderBook
         }
 
         /// <summary>
-        /// Checks whether an existing queue exists
-        /// for the given key. If it doesn't, it creates 
-        /// a new queue, if it does it uses it. It then
-        /// pushes the new order onto the queue and
-        /// writes the queue back into the dictionary.
+        /// Adds an order to the dictionary
         /// </summary>
         /// <param name="order"></param>
         /// <returns></returns>
         public async Task AddOrderAsync(Order order)
         {
-            IReliableDictionary<int, Queue<Order>> orders =
-                await this.stateManager.GetOrAddAsync<IReliableDictionary<int, Queue<Order>>>(this.setName);
+            IReliableDictionary<string, Order> orders =
+                await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
 
             using (ITransaction tx = this.stateManager.CreateTransaction())
             {
-                var tryOrderQueue = await orders.TryGetValueAsync(tx, (int)order.Value);
-
-                Queue<Order> orderQueue;
-                if (tryOrderQueue.HasValue)
-                {
-                    orderQueue = tryOrderQueue.Value;
-                }
-                else
-                {
-                    orderQueue = new Queue<Order>();
-                }
-                orderQueue.Enqueue(order);
-                await orders.SetAsync(tx, (int)order.Value, orderQueue);
+                await orders.TryAddAsync(tx, order.Id, order);
                 await tx.CommitAsync();
             }
             return;
         }
 
         /// <summary>
-        /// Gets the maximum key from the ordered secondary
-        /// index and then attempts to peek the last order
-        /// in its order queue.
+        /// Clears all orders from dictionary
         /// </summary>
         /// <returns></returns>
-        public async Task<Order> PeekMaxOrderAsync()
+        public async Task ClearAsync()
         {
-            var maxKey = this.secondaryIndex.LastOrDefault();
-            if (maxKey == default(int))
-            {
-                return null;
-            }
-            return await GetOrderByKeyAsync(maxKey);
-        }
+            IReliableDictionary<string, Order> orders =
+                await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
 
-        /// <summary>
-        /// Gets the minimum key from the ordered secondary
-        /// index and then attempts to peek the first order
-        /// in its order queue.
-        /// </summary>
-        /// <returns></returns>
-        public async Task<Order> PeekMinOrderAsync()
-        {
-            var minKey = this.secondaryIndex.FirstOrDefault();
-            if (minKey == default(int))
+            this.SecondaryIndex.Clear();
+            using (ITransaction tx = this.stateManager.CreateTransaction())
             {
-                return null;
-            }
-            return await GetOrderByKeyAsync(minKey);
-        }
-
-        /// <summary>
-        /// Checks whether an order is the first in
-        /// the order queue for its value. If it is
-        /// it dequeues it.
-        /// This is assumed to be run after peeking
-        /// a value as a method of removing the
-        /// order from the queue.
-        /// </summary>
-        /// <param name="tx"></param>
-        /// <param name="order"></param>
-        /// <returns></returns>
-        public async Task ResolveOrderAsync(ITransaction tx, Order order)
-        {
-            IReliableDictionary<int, Queue<Order>> orders =
-               await this.stateManager.GetOrAddAsync<IReliableDictionary<int, Queue<Order>>>(this.setName);
-
-            var tryQueue = await orders.TryGetValueAsync(tx, (int)order.Value);
-            if (tryQueue.HasValue)
-            {
-                var queue = tryQueue.Value;
-                var first = queue.Peek();
-                if (first.Id != order.Id)
-                {
-                    throw new Exception($"cannot match order {order.Id} as it is no longer at the front of the queue");
-                }
-                queue.Dequeue();
-                if (queue.Count == 0)
-                {
-                    var removed = await orders.TryRemoveAsync(tx, (int)order.Value);
-                    if (!removed.HasValue)
-                    {
-                        throw new Exception($"failed to remove key {order.Value} when queue empty");
-                    }
-                }
+                await orders.ClearAsync();
             }
         }
 
         /// <summary>
-        /// Grabs the first order in an order queue
-        /// for a given key
+        /// Gets an order by order id
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        private async Task<Order> GetOrderByKeyAsync(int key)
+        private async Task<Order> GetOrderAsync(string id)
         {
-            IReliableDictionary<int, Queue<Order>> orders =
-                await this.stateManager.GetOrAddAsync<IReliableDictionary<int, Queue<Order>>>(this.setName);
+            IReliableDictionary<string, Order> orders =
+                await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
 
-            Order order;
+            Order order = null;
             using (ITransaction tx = this.stateManager.CreateTransaction())
             {
-                if(!await orders.ContainsKeyAsync(tx, key))
+                var result = await orders.TryGetValueAsync(tx, id);
+                if (result.HasValue)
                 {
-                   throw new Exception($"Desired key '{key}' does not exist in dictionary");
-                }
-
-                var tryValue = await orders.TryGetValueAsync(tx, key);
-                if (tryValue.HasValue)
-                {
-                    var value = tryValue.Value;
-                    if (value.Count == 0)
-                    {
-                        throw new Exception($"key '{key}' exists but contains empty queue");
-                    }
-                    order = value.Peek();
-                }
-                else
-                {
-                    throw new Exception($"key '{key}' exists but failed to get it");
+                    order = result.Value;
                 }
                 await tx.CommitAsync();
             }
@@ -211,36 +127,84 @@ namespace OrderBook
         }
 
         /// <summary>
-        /// Gets the queue depth for a given key
+        /// Gets the max order in the dictionary
+        /// </summary>
+        /// <returns></returns>
+        public Order GetMaxOrder()
+        {
+            return this.SecondaryIndex.ToList().LastOrDefault();
+        }
+
+        /// <summary>
+        /// Gets the min order in the dictionary
+        /// </summary>
+        /// <returns></returns>
+        public Order GetMinOrder()
+        {
+            return this.SecondaryIndex.ToList().FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Gets the order count for the dictionary
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public async Task<int> GetCountForKey(int key)
+        public async Task<long> CountAsync()
         {
-            IReliableDictionary<int, Queue<Order>> orders =
-                await this.stateManager.GetOrAddAsync<IReliableDictionary<int, Queue<Order>>>(this.setName);
+            IReliableDictionary<string, Order> orders =
+                await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
 
-            int depth;
+            long count = 0;
             using (ITransaction tx = this.stateManager.CreateTransaction())
             {
-                if (!await orders.ContainsKeyAsync(tx, key))
-                {
-                    throw new Exception($"Desired key '{key}' does not exist in dictionary");
-                }
-
-                var tryValue = await orders.TryGetValueAsync(tx, key);
-                if (tryValue.HasValue)
-                {
-                    var value = tryValue.Value;
-                    depth = value.Count;
-                }
-                else
-                {
-                    throw new Exception($"key '{key}' exists but failed to get it");
-                }
+                count = await orders.GetCountAsync(tx);
                 await tx.CommitAsync();
             }
-            return depth;
+            return count;
+        }
+
+        /// <summary>
+        /// Removes an order from the dictionary
+        /// and the secondary index
+        /// </summary>
+        /// <param name="order"></param>
+        /// <returns></returns>
+        public async Task<bool> RemoveAsync(Order order)
+        {
+            IReliableDictionary<string, Order> orders =
+                await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
+
+            using (var tx = this.stateManager.CreateTransaction())
+            {
+                var result = await orders.TryRemoveAsync(tx, order.Id);
+                if (result.HasValue)
+                {
+                    return this.SecondaryIndex.Remove(order);
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Removes an order from the dictionary
+        /// and secondary index. Uses existing
+        /// transaction that will be handled by
+        /// the caller.
+        /// </summary>
+        /// <param name="tx"></param>
+        /// <param name="order"></param>
+        /// <returns></returns>
+        public async Task<bool> RemoveAsync(ITransaction tx, Order order)
+        {
+            IReliableDictionary<string, Order> orders =
+                await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
+
+            var result = await orders.TryRemoveAsync(tx, order.Id);
+            if (result.HasValue)
+            {
+                return this.SecondaryIndex.Remove(order);
+            }
+            return false;
         }
 
         /// <summary>
@@ -268,9 +232,9 @@ namespace OrderBook
         {
             var entity = e as NotifyStateManagerSingleEntityChangedEventArgs;
 
-            if (entity.ReliableState is IReliableDictionary<int, Queue<Order>>)
+            if (entity.ReliableState is IReliableDictionary<string, Order>)
             {
-                var dictionary = (IReliableDictionary<int, Queue<Order>>)entity.ReliableState;
+                var dictionary = (IReliableDictionary<string, Order>)entity.ReliableState;
                 if (dictionary.Name.LocalPath == this.setName)
                 {
                     dictionary.RebuildNotificationAsyncCallback = this.OnDictionaryRebuildNotificationHandlerAsync;
@@ -284,23 +248,23 @@ namespace OrderBook
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void OnDictionaryChangedHandler(object sender, NotifyDictionaryChangedEventArgs<int, Queue<Order>> e)
+        private void OnDictionaryChangedHandler(object sender, NotifyDictionaryChangedEventArgs<string, Order> e)
         {
             if (e.Action == NotifyDictionaryChangedAction.Add)
             {
-                var addEvent = e as NotifyDictionaryItemAddedEventArgs<int, Queue<Order>>;
+                var addEvent = e as NotifyDictionaryItemAddedEventArgs<string, Order>;
                 this.ProcessDictionaryAddNotification(addEvent);
                 return;
             }
             if (e.Action == NotifyDictionaryChangedAction.Update)
             {
-                var updateEvent = e as NotifyDictionaryItemUpdatedEventArgs<int, Queue<Order>>;
+                var updateEvent = e as NotifyDictionaryItemUpdatedEventArgs<string, Order>;
                 this.ProcessDictionaryUpdateNotification(updateEvent);
                 return;
             }
             if (e.Action == NotifyDictionaryChangedAction.Remove)
             {
-                var removeEvent = e as NotifyDictionaryItemRemovedEventArgs<int, Queue<Order>>;
+                var removeEvent = e as NotifyDictionaryItemRemovedEventArgs<string, Order>;
                 this.ProcessDictionaryRemoveNotification(removeEvent);
                 return;
             }
@@ -315,15 +279,15 @@ namespace OrderBook
         /// <param name="rebuildNotification"></param>
         /// <returns></returns>
         private async Task OnDictionaryRebuildNotificationHandlerAsync(
-             IReliableDictionary<int, Queue<Order>> origin,
-             NotifyDictionaryRebuildEventArgs<int, Queue<Order>> rebuildNotification)
+             IReliableDictionary<string, Order> origin,
+             NotifyDictionaryRebuildEventArgs<string, Order> rebuildNotification)
         {
-            this.secondaryIndex.Clear();
+            this.SecondaryIndex.Clear();
 
             var enumerator = rebuildNotification.State.GetAsyncEnumerator();
             while (await enumerator.MoveNextAsync(CancellationToken.None))
             {
-                this.secondaryIndex.Add(enumerator.Current.Key);
+                this.SecondaryIndex.Add(enumerator.Current.Value);
             }
         }
 
@@ -332,11 +296,11 @@ namespace OrderBook
         /// triggered. Add the new key to our secondary index.
         /// </summary>
         /// <param name="e"></param>
-        private void ProcessDictionaryAddNotification(NotifyDictionaryItemAddedEventArgs<int, Queue<Order>> e)
+        private void ProcessDictionaryAddNotification(NotifyDictionaryItemAddedEventArgs<string, Order> e)
         {
-            if (!this.secondaryIndex.Contains(e.Key))
+            if (e.Value != null)
             {
-                this.secondaryIndex.Add(e.Key);
+                this.SecondaryIndex.Add(e.Value);
             }
         }
 
@@ -346,12 +310,9 @@ namespace OrderBook
         /// don't have it.
         /// </summary>
         /// <param name="e"></param>
-        private void ProcessDictionaryUpdateNotification(NotifyDictionaryItemUpdatedEventArgs<int, Queue<Order>> e)
+        private void ProcessDictionaryUpdateNotification(NotifyDictionaryItemUpdatedEventArgs<string, Order> e)
         {
-            if (!this.secondaryIndex.Contains(e.Key))
-            {
-                this.secondaryIndex.Add(e.Key);
-            }
+            this.SecondaryIndex.Add(e.Value);
         }
 
         /// <summary>
@@ -359,12 +320,10 @@ namespace OrderBook
         /// triggered. Remove the key from our secondary index.
         /// </summary>
         /// <param name="e"></param>
-        private void ProcessDictionaryRemoveNotification(NotifyDictionaryItemRemovedEventArgs<int, Queue<Order>> e)
+        private void ProcessDictionaryRemoveNotification(NotifyDictionaryItemRemovedEventArgs<string, Order> e)
         {
-            if (this.secondaryIndex.Contains(e.Key))
-            {
-                this.secondaryIndex.Remove(e.Key);
-            }
+            var order = this.SecondaryIndex.ToList().Where(x => x.Id == e.Key).FirstOrDefault();
+            this.SecondaryIndex.Remove(order);
         }
     }
 }

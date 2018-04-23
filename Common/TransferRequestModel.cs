@@ -14,6 +14,10 @@ namespace Common
 
         public static implicit operator Transfer(TransferRequestModel request)
         {
+            if (request == null)
+            {
+                return null;
+            }
             var id = Guid.NewGuid().ToString();
             return new Transfer(id, request.Ask, request.Bid);
         }

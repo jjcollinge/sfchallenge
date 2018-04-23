@@ -6,13 +6,24 @@
     <Parameter Name="Fulfillment_TargetReplicaSetSize" DefaultValue="3" />
     <Parameter Name="Fulfillment_DnsName" DefaultValue="fulfillment.exchange" />
     <Parameter Name="Fulfillment_Port" DefaultValue="8080" />
+    <Parameter Name="OrderBook_DnsName" DefaultValue="orderbook.exchange" />
+    <Parameter Name="OrderBook_Port" DefaultValue="80" />
     <Parameter Name="OrderBook_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="OrderBook_PartitionCount" DefaultValue="1" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" DefaultValue="3" />
   </Parameters>
   <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="FulfillmentPkg" ServiceManifestVersion="1.0.0" />
-    <ConfigOverrides />
+    <ConfigOverrides>
+      <ConfigOverride Name="Config">
+        <Settings>
+          <Section Name="OrderBookConfig">
+            <Parameter Name="ServiceDnsName" Value="[OrderBook_DnsName]" />
+            <Parameter Name="servicePort" Value="[OrderBook_Port]" />
+          </Section>
+        </Settings>
+      </ConfigOverride>
+    </ConfigOverrides>
     <ResourceOverrides>
       <Endpoints>
         <Endpoint Name="ServiceEndpoint" Port="[Fulfillment_Port]" />
@@ -45,7 +56,7 @@
         <SingletonPartition />
       </StatefulService>
     </Service>
-    <Service Name="OrderBook">
+    <Service Name="OrderBook" ServiceDnsName="orderbook.exchange">
       <StatefulService ServiceTypeName="OrderBookType" TargetReplicaSetSize="[OrderBook_TargetReplicaSetSize]" MinReplicaSetSize="[OrderBook_MinReplicaSetSize]">
         <SingletonPartition />
       </StatefulService>

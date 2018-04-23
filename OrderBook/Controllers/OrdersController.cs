@@ -22,7 +22,6 @@ namespace OrderBook.Controllers
             this.orderBook = orderBook;
         }
 
-        // GET api/orders
         [HttpGet]
         public async Task<IActionResult> GetAsync()
         {
@@ -30,8 +29,8 @@ namespace OrderBook.Controllers
             {
                 var asks = await this.orderBook.GetAsksAsync();
                 var bids = await this.orderBook.GetBidsAsync();
-                var asksCount = await this.orderBook.GetAsksCountAsync();
-                var bidsCount = await this.orderBook.GetBidsCountAsync();
+                var asksCount = asks.Count;
+                var bidsCount = bids.Count;
                 var view = new OrderBookViewModel {
                     Asks = asks,
                     Bids = bids,
@@ -46,6 +45,13 @@ namespace OrderBook.Controllers
             }
         }
 
+        [HttpDelete]
+        public async Task<IActionResult> DeleteAsync()
+        {
+            await this.orderBook.ClearAllOrders();
+            return this.Ok();
+        }
+
         [Route("bids")]
         [HttpGet]
         public async Task<IActionResult> Bids()
@@ -55,7 +61,7 @@ namespace OrderBook.Controllers
                 var bids = await this.orderBook.GetBidsAsync();
                 return this.Json(bids);
             }
-            catch (InvalidOrderException ex)
+            catch (InvalidAskException ex)
             {
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
@@ -82,14 +88,14 @@ namespace OrderBook.Controllers
 
         [Route("bid")]
         [HttpPost]
-        public async Task<IActionResult> Bid([FromBody] Order order)
+        public async Task<IActionResult> Bid([FromBody] OrderRequestModel order)
         {
             try
             {
-                await this.orderBook.AddBidAsync(order);
-                return this.Ok(order.Id);
+                var orderId = await this.orderBook.AddBidAsync(order);
+                return this.Ok(orderId);
             }
-            catch (InvalidOrderException ex)
+            catch (InvalidAskException ex)
             {
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
@@ -105,14 +111,14 @@ namespace OrderBook.Controllers
 
         [Route("ask")]
         [HttpPost]
-        public async Task<IActionResult> Ask([FromBody] Order order)
+        public async Task<IActionResult> Ask([FromBody] OrderRequestModel order)
         {
             try
             {
-                await this.orderBook.AddAskAsync(order);
-                return this.Ok(order.Id);
+                var orderId = await this.orderBook.AddAskAsync(order);
+                return this.Ok(orderId);
             }
-            catch (InvalidOrderException ex)
+            catch (InvalidAskException ex)
             {
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }

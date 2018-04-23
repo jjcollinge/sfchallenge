@@ -23,6 +23,7 @@
     <PackageReference Include="Microsoft.ServiceFabric.Services" Version="3.0.480" />
     <PackageReference Include="Microsoft.VisualStudio.Web.BrowserLink" Version="2.0.2" />
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="2.0.3" />
+    <PackageReference Include="System.Collections.Immutable.Surrogate" Version="1.1.1" />
   </ItemGroup>
 
   <ItemGroup>
