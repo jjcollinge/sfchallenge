@@ -132,8 +132,7 @@ namespace OrderBook
         /// <returns></returns>
         public Order GetMaxOrder()
         {
-            // ToList ensures we enumerate a copy to avoid contention issues
-            return this.SecondaryIndex.ToList().LastOrDefault();
+            return this.SecondaryIndex.LastOrDefault();
         }
 
         /// <summary>
@@ -142,8 +141,7 @@ namespace OrderBook
         /// <returns></returns>
         public Order GetMinOrder()
         {
-            // ToList ensures we enumerate a copy to avoid contention issues
-            return this.SecondaryIndex.ToList().FirstOrDefault();
+            return this.SecondaryIndex.FirstOrDefault();
         }
 
         /// <summary>
