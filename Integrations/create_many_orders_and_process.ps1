@@ -85,6 +85,7 @@ if ($sellerId -eq "")
 # Allow time for users to be created
 Sleep(2)
 
+log "begin adding orders"
 $runCount = 1000
 for ($i = 0; $i -lt $runCount; $i++)
 {
@@ -118,13 +119,13 @@ for ($i = 0; $i -lt $runCount; $i++)
 }
 
 $transfers = Invoke-RestMethod -Method Get -Uri $transfersEndpoint
-$waitPeriod = 5
 while ($transfers -ne 0)
 {
     $transfers = Invoke-RestMethod -Method Get -Uri $transfersEndpoint
     log "transfer count: ${transfers}"
-    Start-Sleep -Seconds $waitPeriod
+    Start-Sleep -Seconds 5
 }
+log "finished processing orders"
 
 log "test script completed ${runCount} orders, terminating now"
 
