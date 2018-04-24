@@ -12,6 +12,9 @@ using Microsoft.ServiceFabric.Services.Communication.Runtime;
 using Microsoft.ServiceFabric.Services.Runtime;
 using Microsoft.ServiceFabric.Data;
 using Common;
+using System.Net.Http;
+using Newtonsoft.Json;
+using System.Text;
 
 namespace Fulfillment
 {
@@ -24,6 +27,7 @@ namespace Fulfillment
         public const string UserStoreName = "users";
         private TransferQueue Transfers;
         private Users Users;
+        private static readonly HttpClient client = new HttpClient();
 
         public Fulfillment(StatefulServiceContext context)
             : base(context)
@@ -49,8 +53,18 @@ namespace Fulfillment
         public async Task<string> AddTransferAsync(TransferRequestModel transferRequest)
         {
             IsValidTransferRequest(transferRequest);
-            var transferId = await this.Transfers.PushAsync(transferRequest);
+            var transferId = await this.Transfers.EnqueueAsync(transferRequest);
             return transferId;
+        }
+
+        /// <summary>
+        /// Gets the count of the number of transfers currently
+        /// in the transfer queue
+        /// </summary>
+        /// <returns></returns>
+        public async Task<long> GetTransfersCountAsync()
+        {
+            return await this.Transfers.CountAsync();
         }
 
         /// <summary>
@@ -103,15 +117,15 @@ namespace Fulfillment
                 cancellationToken.ThrowIfCancellationRequested();
 
 #if DEBUG
-                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                //await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
 #endif
                 using (var tx = this.StateManager.CreateTransaction())
                 {
-
+                    Transfer transfer = null;
                     try
                     {
                         // Pop a transfer of the transfer queue
-                        var transfer = await this.Transfers.PopAsync(tx);
+                        transfer = await this.Transfers.DequeueAsync(tx);
                         if (transfer != null)
                         {
                             // Get the buyer and seller associated with the transfer
@@ -143,17 +157,47 @@ namespace Fulfillment
                             }
                         }
                     }
-                    catch (Exception ex)
+                    catch (BadBuyerException ex)
                     {
-                        // Exception thrown when handling transfer. Assume invalid transfer,
-                        // we'll commit the transaction to release the lock on the queue,
-                        // log the exception and then skip to the next transfer in the queue.
                         await tx.CommitAsync();
                         ServiceEventSource.Current.Message($"Dropping bad transfer. Reason: {ex.Message}");
+
+                        if (transfer != null)
+                        {
+                            await RedoOrderAsync(transfer.Ask);
+                        }
+                        continue;
+                    }
+                    catch (BadSellerException ex)
+                    {
+                        await tx.CommitAsync();
+                        ServiceEventSource.Current.Message($"Dropping bad transfer. Reason: {ex.Message}");
+
+                        if (transfer != null)
+                        {
+                            await RedoOrderAsync(transfer.Bid);
+                        }
                         continue;
                     }
                 }
             }
+        }
+
+        private async Task RedoOrderAsync(Order order)
+        {
+            var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
+            var dnsName = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["ServiceDnsName"].Value;
+            var port = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["servicePort"].Value;
+
+            var orderBookEndpoint = $"http://{dnsName}:{port}";
+
+            var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
+            var addTransferUri = $"{orderBookEndpoint}/api/transfers";
+#if DEBUG
+            addTransferUri = $"http://localhost:{port}/api/transfers";
+#endif
+            HttpResponseMessage res;
+            res = await client.PostAsync(addTransferUri, content);
         }
 
         public void IsValidUserRequest(UserRequestModel user)
@@ -166,6 +210,10 @@ namespace Fulfillment
 
         private void IsValidTransferRequest(Transfer transfer)
         {
+            if (transfer.Ask == null || transfer.Bid == null)
+            {
+                throw new InvalidTransferRequestException("Bid or ask cannot be null");
+            }
             if (transfer.Ask.Value > transfer.Bid.Value)
             {
                 throw new InvalidTransferRequestException("The ask value cannot be higher than the bid value");
@@ -186,19 +234,19 @@ namespace Fulfillment
         {
             if (seller == null)
             {
-                throw new Exception($"Matched seller '{seller.Id}' doesn't exist");
+                throw new BadSellerException($"Matched seller '{seller}' doesn't exist");
             }
             if (buyer == null)
             {
-                throw new Exception($"Matched seller '{buyer.Id}' doesn't exist");
+                throw new BadBuyerException($"Matched seller '{buyer}' doesn't exist");
             }
             if (seller.Quantity < transfer.Bid.Quantity)
             {
-                throw new Exception($"Matched seller '{seller.Id}' doesn't have suffient quantity to satisfy the transfer");
+                throw new BadSellerException($"Matched seller '{seller.Id}' doesn't have suffient quantity to satisfy the transfer");
             }
             if (buyer.Balance < transfer.Bid.Value)
             {
-                throw new Exception($"Matched buyer '{buyer.Id}' doesn't have suffient balance to satisfy the transfer");
+                throw new BadBuyerException($"Matched buyer '{buyer.Id}' doesn't have suffient balance to satisfy the transfer");
             }
         }
 
@@ -222,7 +270,7 @@ namespace Fulfillment
             buyer = new User(buyer.Id,
                             buyer.Username,
                             buyer.Quantity + transfer.Bid.Quantity,
-                            buyer.Balance - transfer.Bid.Value,
+                            buyer.Balance - (transfer.Bid.Value * transfer.Bid.Quantity),
                             buyerTransfers);
 
             // Apply the transfer operations
@@ -232,13 +280,13 @@ namespace Fulfillment
             seller = new User(seller.Id,
                                 seller.Username,
                                 seller.Quantity - transfer.Bid.Quantity,
-                                seller.Balance + transfer.Bid.Value,
+                                seller.Balance + (transfer.Bid.Value * transfer.Bid.Quantity),
                                 sellerTransfers);
 
             //TODO: Invesitgate failure modes.
             var buyerUpdated = await Users.UpdateUserAsync(tx, buyer);
             var sellerUpdated = await Users.UpdateUserAsync(tx, seller);
-            
+
             return (buyerUpdated && sellerUpdated);
         }
 

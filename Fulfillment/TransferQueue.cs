@@ -19,7 +19,7 @@ namespace Fulfillment
             this.queueName = queueName;
         }
 
-        public async Task<string> PushAsync(Transfer transfer)
+        public async Task<string> EnqueueAsync(Transfer transfer)
         {
             IReliableConcurrentQueue<Transfer> transfers =
              await this.stateManager.GetOrAddAsync<IReliableConcurrentQueue<Transfer>>(queueName);
@@ -32,7 +32,7 @@ namespace Fulfillment
             return transfer.Id;
         }
 
-        public async Task<Transfer> PopAsync(ITransaction tx)
+        public async Task<Transfer> DequeueAsync(ITransaction tx)
         {
             IReliableConcurrentQueue<Transfer> transactions =
              await this.stateManager.GetOrAddAsync<IReliableConcurrentQueue<Transfer>>(queueName);
@@ -44,6 +44,14 @@ namespace Fulfillment
                 transaction = result.Value;
             }
             return transaction;
+        }
+
+        public async Task<long> CountAsync()
+        {
+            IReliableConcurrentQueue<Transfer> transactions =
+                await this.stateManager.GetOrAddAsync<IReliableConcurrentQueue<Transfer>>(queueName);
+
+            return transactions.Count;
         }
     }
 }

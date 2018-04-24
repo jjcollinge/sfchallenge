@@ -44,5 +44,10 @@ namespace Common
             if (obj.GetType() != obj.GetType()) return false;
             return Equals(obj as Transfer);
         }
+
+        public override int GetHashCode()
+        {
+            return new { Id, Ask, Bid }.GetHashCode();
+        }
     }
 }

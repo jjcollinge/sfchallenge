@@ -17,18 +17,8 @@ namespace Fulfillment.Tests
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
 
-            var ask = new Order
-            {
-                Quantity = 10,
-                Value = 10,
-                UserId = "user1",
-            };
-            var bid = new Order
-            {
-                Quantity = 10,
-                Value = 10,
-                UserId = "user2",
-            };
+            var ask = new Order(10, 10, "user1");
+            var bid = new Order(10, 10, "user2");
             var request = new TransferRequestModel
             {
                 Ask = ask,
@@ -50,18 +40,8 @@ namespace Fulfillment.Tests
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
 
-            var ask = new Order
-            {
-                Quantity = 10,
-                Value = 10,
-                UserId = "user1",
-            };
-            var bid = new Order
-            {
-                Quantity = 100,
-                Value = 10,
-                UserId = "user2",
-            };
+            var ask = new Order(10, 10, "user1");
+            var bid = new Order(10, 100, "user2");
             var request = new TransferRequestModel
             {
                 Ask = ask,
@@ -78,18 +58,8 @@ namespace Fulfillment.Tests
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
 
-            var ask = new Order
-            {
-                Quantity = 100,
-                Value = 10,
-                UserId = "user1",
-            };
-            var bid = new Order
-            {
-                Quantity = 100,
-                Value = 40,
-                UserId = "user2",
-            };
+            var ask = new Order(60, 100, "user1");
+            var bid = new Order(40, 100, "user2");
             var request = new TransferRequestModel
             {
                 Ask = ask,

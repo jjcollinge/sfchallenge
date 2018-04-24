@@ -12,14 +12,14 @@ namespace Common
 {
     /// <summary>
     /// Represents a user in the system.
-    /// The class is intentionally immutable
-    /// to avoid data corruption when working
-    /// with reliable collections.
+    /// This class is immutable to avoid
+    /// data corruption when working with
+    /// reliable collections.
     /// </summary>
     [DataContract]
     public sealed class User : IEquatable<User>
     {
-        public User(string id, string username, UInt32 quantity, UInt32 balance, IEnumerable<Transfer> transfers)
+        public User(string id, string username, uint quantity, uint balance, IEnumerable<Transfer> transfers)
         {
             Id = id;
             Username = username;
@@ -41,10 +41,10 @@ namespace Common
         public readonly string Username;
 
         [DataMember]
-        public readonly UInt32 Quantity;
+        public readonly uint Quantity;
 
         [DataMember]
-        public readonly UInt32 Balance;
+        public readonly uint Balance;
 
         [DataMember]
         public IEnumerable<Transfer> Transfers { get; private set; }
@@ -65,6 +65,11 @@ namespace Common
             if (ReferenceEquals(this, obj)) return true;
             if (obj.GetType() != obj.GetType()) return false;
             return Equals(obj as User);
+        }
+
+        public override int GetHashCode()
+        {
+            return new { Id, Username, Quantity, Balance, Transfers }.GetHashCode();
         }
     }
 }

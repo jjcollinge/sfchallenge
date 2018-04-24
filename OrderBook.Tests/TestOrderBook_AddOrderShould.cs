@@ -20,12 +20,7 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order
-            {
-                UserId = "user1",
-                Quantity = 100,
-                Value = 30,
-            };
+            var ask = new Order("user1", 100, 30, "buyer");
 
             try
             {
@@ -36,9 +31,8 @@ namespace OrderBook.Tests
                 // Expected, see line 13.
             }
 
-            var dictionary = await stateManager.TryGetAsync<IReliableDictionary<int, Queue<Order>>>(OrderBook.AskBookName);
-            var queue = (await dictionary.Value.TryGetValueAsync(new MockTransaction(stateManager, 1), (int)ask.Value)).Value;
-            var actual = queue.Dequeue();
+            var dictionary = await stateManager.TryGetAsync<IReliableDictionary<string, Order>>(OrderBook.AskBookName);
+            var actual = (await dictionary.Value.TryGetValueAsync(new MockTransaction(stateManager, 1), ask.Id)).Value;
             Assert.Equal(actual, ask);
         }
 
@@ -49,13 +43,7 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order
-            {
-                UserId = "",
-                Quantity = 100,
-                Value = 30,
-            };
-
+            var ask = new Order("", 100, 30, string.Empty);
             await Assert.ThrowsAsync<InvalidOrderException>(() => service.AddAskAsync(ask));
         }
 
@@ -66,13 +54,7 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order
-            {
-                UserId = "user1",
-                Quantity = 0,
-                Value = 30,
-            };
-
+            var ask = new Order("user1", 0, 30, string.Empty);
             await Assert.ThrowsAsync<InvalidOrderException>(() => service.AddAskAsync(ask));
         }
 
@@ -83,13 +65,7 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order
-            {
-                UserId = "user1",
-                Quantity = 30,
-                Value = 0,
-            };
-
+            var ask = new Order("user1", 30, 0, string.Empty);
             await Assert.ThrowsAsync<InvalidOrderException>(() => service.AddAskAsync(ask));
         }
     }
