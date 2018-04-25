@@ -8,6 +8,9 @@ using Microsoft.ServiceFabric.Services.Remoting.Client;
 
 namespace UserStore.Interface
 {
+    /// <summary>
+    /// A partition aware UserStore client. Distributes the users evenly across all partitions.
+    /// </summary>
     public class UserStoreClient : IUserStore
     {
         private readonly ServiceProxyFactory _serviceProxyFactory;
