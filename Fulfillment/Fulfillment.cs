@@ -15,6 +15,7 @@ using Common;
 using System.Net.Http;
 using Newtonsoft.Json;
 using System.Text;
+using UserStore.Interface;
 
 namespace Fulfillment
 {
@@ -26,21 +27,21 @@ namespace Fulfillment
         public const string TransferQueueName = "transfers";
         public const string UserStoreName = "users";
         private TransferQueue Transfers;
-        private Users Users;
+        private readonly UserStoreClient Users;
         private static readonly HttpClient client = new HttpClient();
 
         public Fulfillment(StatefulServiceContext context)
             : base(context)
         {
             this.Transfers = new TransferQueue(this.StateManager, TransferQueueName);
-            this.Users = new Users(this.StateManager, UserStoreName);
+            this.Users = new UserStoreClient();
         }
 
         public Fulfillment(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
             this.Transfers = new TransferQueue(this.StateManager, TransferQueueName);
-            this.Users = new Users(this.StateManager, UserStoreName);
+            this.Users = new UserStoreClient();
         }
 
         /// <summary>
@@ -93,7 +94,7 @@ namespace Fulfillment
         /// Gets all users from the user store.
         /// </summary>
         /// <returns></returns>
-        public async Task<List<User>> GetUsersAsync()
+        public async Task<IEnumerable<User>> GetUsersAsync()
         {
             return await this.Users.GetUsersAsync();
         }
@@ -286,8 +287,8 @@ namespace Fulfillment
                                 sellerTransfers);
 
             //TODO: Invesitgate failure modes.
-            var buyerUpdated = await Users.UpdateUserAsync(tx, buyer);
-            var sellerUpdated = await Users.UpdateUserAsync(tx, seller);
+            var buyerUpdated = await Users.UpdateUserAsync(buyer);
+            var sellerUpdated = await Users.UpdateUserAsync(seller);
 
             return (buyerUpdated && sellerUpdated);
         }

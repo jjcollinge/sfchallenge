@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
+    <ProjectReference Include="..\UserStore.Interface\UserStore.Interface.csproj" />
   </ItemGroup>
 
 </Project>
