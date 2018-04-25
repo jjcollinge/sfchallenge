@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Fabric;
 using System.Text;
 using System.Threading.Tasks;
 using Common;
@@ -33,6 +35,30 @@ namespace UserStore.Interface
             var userStoreProxy = GetUserStoreProxy(user);
 
             return await userStoreProxy.AddUserAsync(user);
+        }
+
+        /// <summary>
+        /// Retrieves all users from all partitions. Potentially a lot of users! Not something you would normally do.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<IEnumerable<User>> GetUsersAsync()
+        {
+            var users = new List<User>();
+
+            using (var client = new FabricClient())
+            {
+                var partitions = await client.QueryManager.GetPartitionListAsync(_userStoreServiceUri);
+
+                foreach (var partition in partitions)
+                {
+                    var partitionInformation = (Int64RangePartitionInformation)partition.PartitionInformation;
+                    var userStoreProxy = _serviceProxyFactory.CreateServiceProxy<IUserStore>(_userStoreServiceUri, new ServicePartitionKey(partitionInformation.LowKey));
+
+                    users.AddRange(await userStoreProxy.GetUsersAsync());
+                }
+            }
+
+            return users;
         }
 
         public async Task<bool> DeleteUserAsync(string userId)

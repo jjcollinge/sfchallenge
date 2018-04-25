@@ -8,6 +8,8 @@ using UserStore.Interface;
 using Common;
 using Microsoft.ServiceFabric.Data.Collections;
 using System;
+using System.Threading;
+using Microsoft.ServiceFabric.Data;
 
 namespace UserStore
 {
@@ -50,6 +52,38 @@ namespace UserStore
                 await tx.CommitAsync();
             }
             return user;
+        }
+
+        public async Task<IEnumerable<User>> GetUsersAsync()
+        {
+            IReliableDictionary<string, User> users =
+               await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(_storeName);
+
+            var maxExecutionTime = TimeSpan.FromSeconds(30D); // Stop retrieving users after 30 sec
+            var cancellationToken = new CancellationTokenSource(maxExecutionTime).Token;
+
+            var returnList = new List<User>();
+            
+            using (var tx = this.StateManager.CreateTransaction())
+            {
+                var asyncEnumerable = await users.CreateEnumerableAsync(tx);
+                var asyncEnumerator = asyncEnumerable.GetAsyncEnumerator();
+
+                try
+                {
+                    while (await asyncEnumerator.MoveNextAsync(cancellationToken))
+                    {
+                        returnList.Add(asyncEnumerator.Current.Value);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Ignore
+                }
+
+                await tx.CommitAsync();
+            }
+            return returnList;
         }
 
         public async Task<string> AddUserAsync(User user)
