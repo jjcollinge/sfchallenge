@@ -21,6 +21,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserStore", "UserStore\UserStore.csproj", "{1F5CCFC0-4A21-4A5F-A13C-CF44E8EF92C7}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserStore.Interface", "UserStore.Interface\UserStore.Interface.csproj", "{A77A37A8-7E98-4461-A204-2323C3571463}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserStore.Tests", "UserStore.Tests\UserStore.Tests.csproj", "{FBA3C5F3-6156-4FD0-8139-1DD3118EDF5A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -53,6 +59,18 @@ Global
 		{01DE56BA-B457-4651-8E5C-1419F2726880}.Debug|x64.Build.0 = Debug|x64
 		{01DE56BA-B457-4651-8E5C-1419F2726880}.Release|x64.ActiveCfg = Release|x64
 		{01DE56BA-B457-4651-8E5C-1419F2726880}.Release|x64.Build.0 = Release|x64
+		{1F5CCFC0-4A21-4A5F-A13C-CF44E8EF92C7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1F5CCFC0-4A21-4A5F-A13C-CF44E8EF92C7}.Debug|x64.Build.0 = Debug|Any CPU
+		{1F5CCFC0-4A21-4A5F-A13C-CF44E8EF92C7}.Release|x64.ActiveCfg = Release|Any CPU
+		{1F5CCFC0-4A21-4A5F-A13C-CF44E8EF92C7}.Release|x64.Build.0 = Release|Any CPU
+		{A77A37A8-7E98-4461-A204-2323C3571463}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A77A37A8-7E98-4461-A204-2323C3571463}.Debug|x64.Build.0 = Debug|Any CPU
+		{A77A37A8-7E98-4461-A204-2323C3571463}.Release|x64.ActiveCfg = Release|Any CPU
+		{A77A37A8-7E98-4461-A204-2323C3571463}.Release|x64.Build.0 = Release|Any CPU
+		{FBA3C5F3-6156-4FD0-8139-1DD3118EDF5A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FBA3C5F3-6156-4FD0-8139-1DD3118EDF5A}.Debug|x64.Build.0 = Debug|Any CPU
+		{FBA3C5F3-6156-4FD0-8139-1DD3118EDF5A}.Release|x64.ActiveCfg = Release|Any CPU
+		{FBA3C5F3-6156-4FD0-8139-1DD3118EDF5A}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

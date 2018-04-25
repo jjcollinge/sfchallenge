@@ -31,6 +31,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Fulfillment\Fulfillment.csproj" />
     <ProjectReference Include="..\OrderBook\OrderBook.csproj" />
+    <ProjectReference Include="..\UserStore\UserStore.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="packages.config" />
