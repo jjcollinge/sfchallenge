@@ -41,7 +41,7 @@ namespace UserStore.Interface
         /// Retrieves all users from all partitions. Potentially a lot of users! Not something you would normally do.
         /// </summary>
         /// <returns></returns>
-        public async Task<IEnumerable<User>> GetUsersAsync()
+        public async Task<List<User>> GetUsersAsync()
         {
             var users = new List<User>();
 

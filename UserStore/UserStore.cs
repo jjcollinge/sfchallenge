@@ -54,7 +54,7 @@ namespace UserStore
             return user;
         }
 
-        public async Task<IEnumerable<User>> GetUsersAsync()
+        public async Task<List<User>> GetUsersAsync()
         {
             IReliableDictionary<string, User> users =
                await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(_storeName);

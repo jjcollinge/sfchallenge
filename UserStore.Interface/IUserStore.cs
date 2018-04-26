@@ -10,7 +10,10 @@ namespace UserStore.Interface
     public interface IUserStore : IService
     {
         Task<User> GetUserAsync(string userId);
-        Task<IEnumerable<User>> GetUsersAsync();
+        /// <remarks>
+        /// V2 Remoting bug does not allow return types to be of none concrete types like IEnumerable<T>. https://github.com/Azure/service-fabric-issues/issues/735
+        /// </remarks>
+        Task<List<User>> GetUsersAsync();
         Task<string> AddUserAsync(User user);
         Task<bool> UpdateUserAsync(User user);
         Task<bool> DeleteUserAsync(string userId);
