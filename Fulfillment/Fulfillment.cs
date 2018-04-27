@@ -147,6 +147,7 @@ namespace Fulfillment
                                 // successfully updated. We can now commit the transaction
                                 // to release our lock on the queue.
                                 await tx.CommitAsync();
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"transfer {transfer.Id} completed");
                             }
                             else
                             {
@@ -154,6 +155,7 @@ namespace Fulfillment
                                 // We will abort the transaction and assume a transient
                                 // failure.
                                 tx.Abort();
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"transfer {transfer.Id} aborted");
                             }
                         }
                     }

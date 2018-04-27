@@ -26,11 +26,11 @@ namespace OrderBook
         // Stores keys in ascending order.
         // Note: This is public for testing purposes as the required
         // mock reliable collection notifications are not implemented.
-        public SortedSet<Order> SecondaryIndex;
+        public ImmutableSortedSet<Order> SecondaryIndex;
 
         public OrderSet(IReliableStateManager stateManager, string setName)
         {
-            this.SecondaryIndex = new SortedSet<Order>();
+            this.SecondaryIndex = ImmutableSortedSet.Create<Order>();
 
             this.stateManager = stateManager;
             this.setName = setName;
@@ -132,7 +132,7 @@ namespace OrderBook
         /// <returns></returns>
         public Order GetMaxOrder()
         {
-            return this.SecondaryIndex.ToList().LastOrDefault();
+            return this.SecondaryIndex.LastOrDefault();
         }
 
         /// <summary>
@@ -141,7 +141,7 @@ namespace OrderBook
         /// <returns></returns>
         public Order GetMinOrder()
         {
-            return this.SecondaryIndex.ToList().FirstOrDefault();
+            return this.SecondaryIndex.FirstOrDefault();
         }
 
         /// <summary>
@@ -179,7 +179,11 @@ namespace OrderBook
                 var result = await orders.TryRemoveAsync(tx, order.Id);
                 if (result.HasValue)
                 {
-                    return this.SecondaryIndex.Remove(order);
+                    lock (this.SecondaryIndex)
+                    {
+                        this.SecondaryIndex = this.SecondaryIndex.Remove(order);
+                    }
+                    return true;
                 }
             }
             return false;
@@ -202,7 +206,11 @@ namespace OrderBook
             var result = await orders.TryRemoveAsync(tx, order.Id);
             if (result.HasValue)
             {
-                return this.SecondaryIndex.Remove(order);
+                lock (this.SecondaryIndex)
+                {
+                    this.SecondaryIndex = this.SecondaryIndex.Remove(order);
+                }
+                return true;
             }
             return false;
         }
@@ -287,7 +295,10 @@ namespace OrderBook
             var enumerator = rebuildNotification.State.GetAsyncEnumerator();
             while (await enumerator.MoveNextAsync(CancellationToken.None))
             {
-                this.SecondaryIndex.Add(enumerator.Current.Value);
+                lock (this.SecondaryIndex)
+                {
+                    this.SecondaryIndex = this.SecondaryIndex.Add(enumerator.Current.Value);
+                }
             }
         }
 
@@ -298,9 +309,12 @@ namespace OrderBook
         /// <param name="e"></param>
         private void ProcessDictionaryAddNotification(NotifyDictionaryItemAddedEventArgs<string, Order> e)
         {
-            if (e.Value != null)
+            if (e?.Value != null)
             {
-                this.SecondaryIndex.Add(e.Value);
+                lock (this.SecondaryIndex)
+                {
+                    this.SecondaryIndex = this.SecondaryIndex.Add(e.Value);
+                }
             }
         }
 
@@ -312,7 +326,13 @@ namespace OrderBook
         /// <param name="e"></param>
         private void ProcessDictionaryUpdateNotification(NotifyDictionaryItemUpdatedEventArgs<string, Order> e)
         {
-            this.SecondaryIndex.Add(e.Value);
+            if (e?.Value != null)
+            {
+                lock (this.SecondaryIndex)
+                {
+                    this.SecondaryIndex = this.SecondaryIndex.Add(e.Value);
+                }
+            }
         }
 
         /// <summary>
@@ -322,8 +342,14 @@ namespace OrderBook
         /// <param name="e"></param>
         private void ProcessDictionaryRemoveNotification(NotifyDictionaryItemRemovedEventArgs<string, Order> e)
         {
-            var order = this.SecondaryIndex.ToList().Where(x => x.Id == e.Key).FirstOrDefault();
-            this.SecondaryIndex.Remove(order);
+            var order = this.SecondaryIndex.Where(x => x.Id == e.Key).FirstOrDefault();
+            if (order != null)
+            {
+                lock (this.SecondaryIndex)
+                {
+                    this.SecondaryIndex = this.SecondaryIndex.Remove(order);
+                }
+            }
         }
     }
 }
