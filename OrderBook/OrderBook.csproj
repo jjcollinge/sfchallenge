@@ -4,6 +4,7 @@
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <RuntimeIdentifier>win7-x64</RuntimeIdentifier>
     <IsServiceFabricServiceProject>True</IsServiceFabricServiceProject>
+    <Platforms>x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
