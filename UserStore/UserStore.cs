@@ -16,12 +16,15 @@ namespace UserStore
     /// <summary>
     /// A statefull service, used to store Users. Access via binary remoting based on the V2 Remoting stack
     /// </summary>
-    internal sealed class UserStore : StatefulService, IUserStore
+    public sealed class UserStore : StatefulService, IUserStore
     {
-        private string _storeName = "UserStore";
+        public const string StateManagerKey = "UserStore";
 
         public UserStore(StatefulServiceContext context)
             : base(context)
+        { }
+        public UserStore(StatefulServiceContext context, IReliableStateManagerReplica2 reliableStateManagerReplica)
+            : base(context, reliableStateManagerReplica)
         { }
 
         /// <summary>
@@ -39,7 +42,7 @@ namespace UserStore
         public async Task<User> GetUserAsync(string userId)
         {
             IReliableDictionary<string, User> users =
-               await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(_storeName);
+               await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
 
             User user = null;
             using (var tx = this.StateManager.CreateTransaction())
@@ -57,7 +60,7 @@ namespace UserStore
         public async Task<List<User>> GetUsersAsync()
         {
             IReliableDictionary<string, User> users =
-               await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(_storeName);
+               await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
 
             var maxExecutionTime = TimeSpan.FromSeconds(30D); // Stop retrieving users after 30 sec
             var cancellationToken = new CancellationTokenSource(maxExecutionTime).Token;
@@ -89,7 +92,7 @@ namespace UserStore
         public async Task<string> AddUserAsync(User user)
         {
             IReliableDictionary<string, User> users =
-              await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(_storeName);
+              await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
 
             using (var tx = this.StateManager.CreateTransaction())
             {
@@ -102,7 +105,7 @@ namespace UserStore
         public async Task<bool> UpdateUserAsync(User user)
         {
             IReliableDictionary<string, User> users =
-              await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(_storeName);
+              await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
 
             using (var tx = this.StateManager.CreateTransaction())
             {
@@ -121,7 +124,7 @@ namespace UserStore
         public async Task<bool> DeleteUserAsync(string userId)
         {
             IReliableDictionary<string, User> users =
-              await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(_storeName);
+              await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
 
             bool removed;
             using (var tx = this.StateManager.CreateTransaction())
