@@ -109,15 +109,19 @@ namespace UserStore
 
             using (var tx = this.StateManager.CreateTransaction())
             {
+                bool result;
                 var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
                 if (current.HasValue)
                 {
-                    return await users.TryUpdateAsync(tx, user.Id, user, current.Value);
+                    result = await users.TryUpdateAsync(tx, user.Id, user, current.Value);
+                    await tx.CommitAsync();
                 }
                 else
                 {
                     throw new ApplicationException($"Cannot update non existent user '{user.Id}'");
                 }
+
+                return result;
             }
         }
         
