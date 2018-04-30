@@ -10,7 +10,7 @@ namespace UserStore.Tests
     public class TestUserStore
     {
         [Fact]
-        public async Task StoreAndRetrieve()
+        public async Task StoreUser()
         {
             var context = MockStatefulServiceContextFactory.Default;
             var stateManager = new MockReliableStateManager();
@@ -27,7 +27,7 @@ namespace UserStore.Tests
             //get state
             var dictionary = await stateManager.TryGetAsync<IReliableDictionary<string, User>>(UserStore.StateManagerKey);
 
-            var actual = (await dictionary.Value.TryGetValueAsync(stateManager.CreateTransaction(), sutUser.Id)).Value;
+            var actual = (await dictionary.Value.TryGetValueAsync(new MockTransaction(stateManager, 1), sutUser.Id)).Value;
             Assert.Equal(sutUser, actual);
         }
     }

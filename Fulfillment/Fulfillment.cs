@@ -25,7 +25,6 @@ namespace Fulfillment
     public class Fulfillment : StatefulService
     {
         public const string TransferQueueName = "transfers";
-        public const string UserStoreName = "users";
         private TransferQueue Transfers;
         private readonly UserStoreClient Users;
         private static readonly HttpClient client = new HttpClient();
