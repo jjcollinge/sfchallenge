@@ -13,6 +13,7 @@ namespace UserStore
         /// </summary>
         private static void Main()
         {
+            new ArgumentException();
             try
             {
                 // The ServiceManifest.XML file defines one or more service type names.

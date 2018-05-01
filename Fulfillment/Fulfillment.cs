@@ -117,7 +117,7 @@ namespace Fulfillment
                 cancellationToken.ThrowIfCancellationRequested();
 
 #if DEBUG
-                //await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
 #endif
                 using (var tx = this.StateManager.CreateTransaction())
                 {
