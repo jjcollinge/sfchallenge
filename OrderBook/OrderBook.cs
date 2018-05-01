@@ -20,6 +20,7 @@ using Newtonsoft.Json;
 using System.Collections.Immutable;
 using System.Runtime.Serialization;
 using System.Net.Http.Headers;
+using System.Fabric.Description;
 
 namespace OrderBook
 {
@@ -28,12 +29,17 @@ namespace OrderBook
     /// </summary>
     public class OrderBook : StatefulService
     {
+        // Names used as key to identify reliable dictionary in the state manager
         public const string AskBookName = "books/asks";
         public const string BidBookName = "books/bids";
+
+        // Order sets for both asks (sales) and bids (buys)
         private OrderSet asks;
         private OrderSet bids;
-        private string fulfillmentEndpoint;
+
+        // HTTP details for communicating with Fulfillment service
         private static readonly HttpClient client = new HttpClient();
+        private string fulfillmentEndpoint;
 
         public OrderBook(StatefulServiceContext context)
             : base(context)
@@ -42,6 +48,8 @@ namespace OrderBook
             this.bids = new OrderSet(this.StateManager, BidBookName);
         }
 
+        // This constructor is used during unit testing by setting a mock
+        // IReliableStateManagerReplica
         public OrderBook(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
@@ -230,9 +238,12 @@ namespace OrderBook
         /// <returns></returns>
         protected override async Task RunAsync(CancellationToken cancellationToken)
         {
+            // Get configuration from our setting.xml file
             var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
             var dnsName = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["ServiceDnsName"].Value;
             var port = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["servicePort"].Value;
+
+            // If debugging locally, don't depend on Service Fabric's DNS service
 #if DEBUG
             dnsName = "localhost";
 #endif
@@ -249,13 +260,16 @@ namespace OrderBook
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                ServiceEventSource.Current.ServiceMessage(this.Context, $"Starting matching loop....");
-
+                // If debugging locally, throttle loop to avoid
+                // thrashing machine.
 #if DEBUG
-                //await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
 #endif
+                // Get the maximum bid and minimum ask
                 var maxBid = this.bids.GetMaxOrder();
                 var minAsk = this.asks.GetMinOrder();
+
+                // Check if match
                 if (IsMatch(maxBid, minAsk))
                 {
                     ServiceEventSource.Current.ServiceMessage(this.Context, $"New match: order {maxBid.Id} and order {minAsk.Id}");
@@ -264,8 +278,9 @@ namespace OrderBook
                     {
                         // In this exchange, the transfer is fulfilled at
                         // the value the buyer is willing to pay. Therefore,
-                        // the seller may get more value than they willing
-                        // to accept.
+                        // the seller may get more value than they were 
+                        // willing to accept.
+
                         // We split the ask incase the seller had a bigger
                         // quantity of goods than the buyer wished to bid for.
                         // The cost per unit is kept consistent between the
@@ -278,7 +293,7 @@ namespace OrderBook
                         }
                         match = matchingAsk;
                     }
-                    catch(InvalidAskException)
+                    catch (InvalidAskException)
                     {
                         // The ask did not meet our validation criteria.
                         // The bid may still be valid so we'll leave it.
@@ -303,7 +318,7 @@ namespace OrderBook
                         Bid = maxBid,
                     };
                     // Send the transfer to our fulfillment
-                    // service.
+                    // service for fulfillment.
                     var content = new StringContent(JsonConvert.SerializeObject(transfer), Encoding.UTF8, "application/json");
                     HttpResponseMessage res;
                     try
@@ -325,9 +340,9 @@ namespace OrderBook
                             var removedBid = await this.bids.RemoveAsync(tx, maxBid);
                             if (removedAsk && removedBid)
                             {
-                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Removed Ask {minAsk.Id} and Bid {maxBid.Id}");
                                 // Committing our transaction will remove both the ask and the bid
                                 // from our orders.
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Removed Ask {minAsk.Id} and Bid {maxBid.Id}");
                                 await tx.CommitAsync();
 
                                 var transferId = await res.Content.ReadAsStringAsync();
@@ -335,9 +350,9 @@ namespace OrderBook
                             }
                             else
                             {
-                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Failed to remove orders, so requeuing");
                                 // Abort the transaction to ensure both the ask and the bid
                                 // stay in our orders.
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Failed to remove orders, so requeuing");
                                 tx.Abort();
                                 continue;
                             }

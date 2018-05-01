@@ -18,7 +18,7 @@ namespace Common
             {
                 return null;
             }
-            var id = Guid.NewGuid().ToString();
+            var id = request.Ask.Id + "_" + request.Bid.Id;
             return new Transfer(id, request.Ask, request.Bid);
         }
     }
