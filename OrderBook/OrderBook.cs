@@ -248,6 +248,9 @@ namespace OrderBook
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                ServiceEventSource.Current.ServiceMessage(this.Context, $"Starting matching loop....");
+
 #if DEBUG
                 //await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
 #endif

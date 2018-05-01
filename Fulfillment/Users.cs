@@ -79,6 +79,12 @@ namespace Fulfillment
 
             using (var tx = this.stateManager.CreateTransaction())
             {
+                var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
+                if (current.HasValue)
+                {
+                    await UpdateUserAsync(tx, user);
+                    return user.Id;
+                }
                 await users.AddAsync(tx, user.Id, user);
                 await tx.CommitAsync();
             }
