@@ -7,8 +7,8 @@
     <Parameter Name="Fulfillment_PartitionCount" Value="1" />
     <Parameter Name="Fulfillment_MinReplicaSetSize" Value="3" />
     <Parameter Name="Fulfillment_TargetReplicaSetSize" Value="3" />
-    <Parameter Name="Fulfillment_DnsName" Value="fulfillment.exchange" />
-    <Parameter Name="Fulfillment_Port" Value="8080" />
+    <Parameter Name="Fulfillment_DnsName" Value="localhost" />
+    <Parameter Name="OrderBook_DnsName" Value="localhost" />
     <Parameter Name="OrderBook_PartitionCount" Value="1" />
     <Parameter Name="OrderBook_MinReplicaSetSize" Value="3" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" Value="3" />

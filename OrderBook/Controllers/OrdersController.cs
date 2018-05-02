@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Fabric;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Common;
@@ -107,6 +108,10 @@ namespace OrderBook.Controllers
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
+            catch (MaxOrdersExceededException )
+            {
+                return new StatusCodeResult(429);
+            }
         }
 
         [Route("ask")]
@@ -129,6 +134,10 @@ namespace OrderBook.Controllers
             catch (FabricException)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
+            }
+            catch (MaxOrdersExceededException)
+            {
+                return new StatusCodeResult(429);
             }
         }
     }

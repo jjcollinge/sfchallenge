@@ -116,9 +116,10 @@ namespace Fulfillment
                 // runtime can kill us properly.
                 cancellationToken.ThrowIfCancellationRequested();
 
-#if DEBUG
-                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
-#endif
+                // Throttle loop: This limit
+                // cannot be removed or you will fail an Audit. 
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+
                 using (var tx = this.StateManager.CreateTransaction())
                 {
                     Transfer transfer = null;
@@ -188,18 +189,15 @@ namespace Fulfillment
         private async Task RedoOrderAsync(Order order)
         {
             var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
-            var dnsName = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["ServiceDnsName"].Value;
-            var port = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["servicePort"].Value;
+            var dnsName = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["OrderBook_DnsName"].Value;
+            var port = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["OrderBook_Port"].Value;
 
             var orderBookEndpoint = $"http://{dnsName}:{port}";
 
             var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
-            var addTransferUri = $"{orderBookEndpoint}/api/transfers";
-#if DEBUG
-            addTransferUri = $"http://localhost:{port}/api/transfers";
-#endif
+            var addOrderUri = $"{orderBookEndpoint}/api/orders";
             HttpResponseMessage res;
-            res = await client.PostAsync(addTransferUri, content);
+            res = await client.PostAsync(addOrderUri, content);
         }
 
         public void IsValidUserRequest(UserRequestModel user)

@@ -29,6 +29,7 @@ namespace OrderBook
     /// </summary>
     public class OrderBook : StatefulService
     {
+
         // Names used as key to identify reliable dictionary in the state manager
         public const string AskBookName = "books/asks";
         public const string BidBookName = "books/bids";
@@ -41,11 +42,15 @@ namespace OrderBook
         private static readonly HttpClient client = new HttpClient();
         private string fulfillmentEndpoint;
 
+        public ConfigurationPackage configPackage { get; private set; }
+
         public OrderBook(StatefulServiceContext context)
             : base(context)
         {
+            Init();
             this.asks = new OrderSet(this.StateManager, AskBookName);
             this.bids = new OrderSet(this.StateManager, BidBookName);
+
         }
 
         // This constructor is used during unit testing by setting a mock
@@ -53,8 +58,14 @@ namespace OrderBook
         public OrderBook(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
+            Init();
             this.asks = new OrderSet(reliableStateManagerReplica, AskBookName);
             this.bids = new OrderSet(reliableStateManagerReplica, BidBookName);
+        }
+
+        private void Init()
+        {
+            configPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
         }
 
         /// <summary>
@@ -65,6 +76,16 @@ namespace OrderBook
         public async Task<string> AddAskAsync(Order order)
         {
             IsValidOrder(order);
+            var currentAsks = await asks.CountAsync();
+
+            // You have an SLA with management to not allow orders when a backlog of more than 200 are pending
+            // Changing this value with fail a system audit. Other approaches much be used to scale.
+            var maxPendingAsks = int.Parse(configPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
+            if (currentAsks > maxPendingAsks)
+            {
+                throw new MaxOrdersExceededException(currentAsks);
+            }
+
             await this.asks.AddOrderAsync(order);
             return order.Id;
         }
@@ -77,6 +98,17 @@ namespace OrderBook
         public async Task<string> AddBidAsync(Order order)
         {
             IsValidOrder(order);
+            var currentBids = await this.bids.CountAsync();
+
+            // You have an SLA with management to not allow orders when a backlog of more than 200 are pending
+            // Changing this value with fail a system audit. Other approaches much be used to scale.
+            var maxPendingBids = int.Parse(configPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxBidsPending"].Value);
+
+            if (currentBids > maxPendingBids)
+            {
+                throw new MaxOrdersExceededException(currentBids);
+            }
+
             await this.bids.AddOrderAsync(order);
             return order.Id;
         }
@@ -240,13 +272,9 @@ namespace OrderBook
         {
             // Get configuration from our setting.xml file
             var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
-            var dnsName = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["ServiceDnsName"].Value;
-            var port = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["servicePort"].Value;
+            var dnsName = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Fulfillment_DnsName"].Value;
+            var port = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Fulfillment_Port"].Value;
 
-            // If debugging locally, don't depend on Service Fabric's DNS service
-#if DEBUG
-            dnsName = "localhost";
-#endif
             fulfillmentEndpoint = $"http://{dnsName}:{port}";
 
             client.DefaultRequestHeaders
@@ -260,11 +288,10 @@ namespace OrderBook
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // If debugging locally, throttle loop to avoid
-                // thrashing machine.
-#if DEBUG
-                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
-#endif
+                // Throttle loop: This limit
+                // cannot be removed or you will fail an Audit. 
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+
                 // Get the maximum bid and minimum ask
                 var maxBid = this.bids.GetMaxOrder();
                 var minAsk = this.asks.GetMinOrder();
@@ -327,7 +354,7 @@ namespace OrderBook
                     }
                     catch (Exception ex)
                     {
-                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Error sending transfer to fulfillment service. Error: '{ex.Message}'. Aborting match");
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Error sending transfer to fulfillment service. Error: '{ex.Message}'. Aborting match", ex);
                         continue;
                     }
                     // If the response is successful, assume

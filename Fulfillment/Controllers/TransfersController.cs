@@ -31,8 +31,9 @@ namespace Fulfillment.Controllers
             {
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                ServiceEventSource.Current.ServiceMessage(fulfillment.Context, "Failed completing transfer..", transferRequest, ex);
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
         }
