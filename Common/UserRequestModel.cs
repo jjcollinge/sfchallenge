@@ -7,6 +7,7 @@ namespace Common
 {
     public class UserRequestModel
     {
+        public string Id { get; set; }
         public string Username { get; set; }
         public UInt32 Quantity { get; set; }
 
@@ -14,8 +15,11 @@ namespace Common
 
         public static implicit operator User(UserRequestModel request)
         {
-            var id = Guid.NewGuid().ToString();
-            return new User(id, request.Username, request.Quantity, request.Balance, null);
+            if (request.Id == null)
+            {
+                request.Id = Guid.NewGuid().ToString();
+            }
+            return new User(request.Id, request.Username, request.Quantity, request.Balance, null);
         }
     }
 }

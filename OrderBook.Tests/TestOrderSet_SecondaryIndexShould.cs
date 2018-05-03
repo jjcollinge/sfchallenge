@@ -21,9 +21,9 @@ namespace OrderBook.Tests
             var order2 = new Order(12, 5, string.Empty);
             var order3 = new Order(5, 10, string.Empty);
 
-            orderSet.SecondaryIndex.Add(order1);
-            orderSet.SecondaryIndex.Add(order2);
-            orderSet.SecondaryIndex.Add(order3);
+            orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order1);
+            orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order2);
+            orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order3);
 
             var max = orderSet.GetMaxOrder();
             Assert.Equal(order2, max);
@@ -40,9 +40,9 @@ namespace OrderBook.Tests
             var order2 = new Order(10, 10, string.Empty);
             var order3 = new Order(10, 10, string.Empty);
 
-            orderSet.SecondaryIndex.Add(order1);
-            orderSet.SecondaryIndex.Add(order2);
-            orderSet.SecondaryIndex.Add(order3);
+            orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order1);
+            orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order2);
+            orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order3);
 
             var max = orderSet.GetMaxOrder();
             Assert.Equal(order1, max);
@@ -59,9 +59,9 @@ namespace OrderBook.Tests
             var order2 = new Order(12, 5, string.Empty);
             var order3 = new Order(5, 10, string.Empty);
 
-            orderSet.SecondaryIndex.Add(order1);
-            orderSet.SecondaryIndex.Add(order2);
-            orderSet.SecondaryIndex.Add(order3);
+            orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order1);
+            orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order2);
+            orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order3);
 
             var min = orderSet.GetMinOrder();
             Assert.Equal(order3, min);
