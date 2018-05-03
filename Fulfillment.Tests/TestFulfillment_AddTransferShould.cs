@@ -2,9 +2,13 @@ using Common;
 using Microsoft.ServiceFabric.Data.Collections;
 using ServiceFabric.Mocks;
 using System;
+using System.Collections.Generic;
+using System.Fabric;
+using System.Fabric.Description;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
+using static ServiceFabric.Mocks.MockConfigurationPackage;
 
 namespace Fulfillment.Tests
 {
@@ -13,10 +17,9 @@ namespace Fulfillment.Tests
         [Fact]
         public async Task AddValidTransferToQueue()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
-
             var ask = new Order(10, 10, "user1");
             var bid = new Order(10, 10, "user2");
             var request = new TransferRequestModel
@@ -36,7 +39,7 @@ namespace Fulfillment.Tests
         [Fact]
         public async Task ThrowIfAskQuantityIsLowerThanBidQuantity()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
 
@@ -54,7 +57,7 @@ namespace Fulfillment.Tests
         [Fact]
         public async Task ThrowIfAskValueIsHigherThanBidValue()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
 

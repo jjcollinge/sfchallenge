@@ -2,8 +2,8 @@
     [string]$domain="localhost"
 )
 
-$ordersSvcEndpoint = "http://${domain}:80"
-$fulfillmentSvcEndpoint = "http://${domain}:8080"
+$ordersSvcEndpoint = "http://${domain}:9081"
+$fulfillmentSvcEndpoint = "http://${domain}:9080"
 $bidEndpoint = "${ordersSvcEndpoint}/api/orders/bid"
 $askEndpoint = "${ordersSvcEndpoint}/api/orders/ask"
 $ordersEndpoint = "${ordersSvcEndpoint}/api/orders"
@@ -86,7 +86,7 @@ if ($sellerId -eq "")
 Sleep(2)
 
 log "begin adding orders"
-$runCount = 1000
+$runCount = 50
 for ($i = 0; $i -lt $runCount; $i++)
 {
     # Create bid
@@ -117,6 +117,9 @@ for ($i = 0; $i -lt $runCount; $i++)
         exit
     }
 }
+
+# Delay long enough for atleast 1 transfer to get to the queue
+Start-Sleep -Seconds 5
 
 $transfers = Invoke-RestMethod -Method Get -Uri $transfersEndpoint
 while ($transfers -ne 0)

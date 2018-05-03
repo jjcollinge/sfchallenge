@@ -16,9 +16,9 @@ namespace UserStore.Tests
             var stateManager = new MockReliableStateManager();
             var service = new UserStore(context, stateManager);
 
-            var sutUser = new User("42", "Anders", 42, 128, new List<Transfer>()
+            var sutUser = new User("42", "Anders", 42, 128, new List<string>()
                 {
-                    new Transfer("t1", new Order("o1", 10, 1, "userId"), new Order("o2", 20, 2, "userId")),
+                    "t1"
                 });
 
             //create state
