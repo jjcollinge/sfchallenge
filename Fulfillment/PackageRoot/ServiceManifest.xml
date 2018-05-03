@@ -26,7 +26,7 @@
 
   <Resources>
     <Endpoints>
-      <Endpoint Protocol="http" Name="ServiceEndpoint" />
+      <Endpoint Protocol="http" Name="ServiceEndpoint" Port="9080" />
     </Endpoints>
   </Resources>
 </ServiceManifest>

@@ -16,6 +16,7 @@ namespace OrderBook.Controllers
     [Route("api/[controller]")]
     public class OrdersController : Controller
     {
+        private static bool IsAcceptingNewOrders = true;
         private readonly OrderBook orderBook;
 
         public OrdersController(OrderBook orderBook)
@@ -91,6 +92,13 @@ namespace OrderBook.Controllers
         [HttpPost]
         public async Task<IActionResult> Bid([FromBody] OrderRequestModel order)
         {
+            if (!IsAcceptingNewOrders)
+            {
+                ServiceEventSource.Current.ServiceMaxPendingCooldown();
+                await Task.Delay(1200);
+                return new StatusCodeResult(429);
+            }
+
             try
             {
                 var orderId = await this.orderBook.AddBidAsync(order);
@@ -98,18 +106,26 @@ namespace OrderBook.Controllers
             }
             catch (InvalidAskException ex)
             {
+                ServiceEventSource.Current.ServiceException(orderBook.Context, "Invalid ask", ex);
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
-            catch (FabricNotPrimaryException)
+            catch (FabricNotPrimaryException ex)
             {
+                ServiceEventSource.Current.ServiceException(orderBook.Context, "NotPrimary", ex);
+
                 return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
             }
-            catch (FabricException)
+            catch (FabricException ex)
             {
+                ServiceEventSource.Current.ServiceException(orderBook.Context, "FabricException", ex);
+
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
-            catch (MaxOrdersExceededException )
+            catch (MaxOrdersExceededException)
             {
+                IsAcceptingNewOrders = false;
+                await Task.Delay(TimeSpan.FromSeconds(15));
+                IsAcceptingNewOrders = true;
                 return new StatusCodeResult(429);
             }
         }
@@ -118,6 +134,13 @@ namespace OrderBook.Controllers
         [HttpPost]
         public async Task<IActionResult> Ask([FromBody] OrderRequestModel order)
         {
+            if (!IsAcceptingNewOrders)
+            {
+                ServiceEventSource.Current.ServiceMaxPendingCooldown();
+                await Task.Delay(1200);
+                return new StatusCodeResult(429);
+            }
+
             try
             {
                 var orderId = await this.orderBook.AddAskAsync(order);
@@ -125,18 +148,26 @@ namespace OrderBook.Controllers
             }
             catch (InvalidAskException ex)
             {
+                ServiceEventSource.Current.ServiceException(orderBook.Context, "Invalid ask", ex);
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
-            catch (FabricNotPrimaryException)
+            catch (FabricNotPrimaryException ex)
             {
+                ServiceEventSource.Current.ServiceException(orderBook.Context, "NotPrimary", ex);
+
                 return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
             }
-            catch (FabricException)
+            catch (FabricException ex)
             {
+                ServiceEventSource.Current.ServiceException(orderBook.Context, "FabricException", ex);
+
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
             catch (MaxOrdersExceededException)
             {
+                IsAcceptingNewOrders = false;
+                await Task.Delay(TimeSpan.FromSeconds(15));
+                IsAcceptingNewOrders = true;
                 return new StatusCodeResult(429);
             }
         }

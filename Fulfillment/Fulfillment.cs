@@ -29,9 +29,12 @@ namespace Fulfillment
         private readonly UserStoreClient Users;
         private static readonly HttpClient client = new HttpClient();
 
+        public ConfigurationPackage configPackage { get; private set; }
+
         public Fulfillment(StatefulServiceContext context)
             : base(context)
         {
+            Init();
             this.Transfers = new TransferQueue(this.StateManager, TransferQueueName);
             this.Users = new UserStoreClient();
         }
@@ -39,8 +42,14 @@ namespace Fulfillment
         public Fulfillment(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
+            Init();
             this.Transfers = new TransferQueue(this.StateManager, TransferQueueName);
             this.Users = new UserStoreClient();
+        }
+
+        private void Init()
+        {
+            configPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
         }
 
         /// <summary>
@@ -53,6 +62,14 @@ namespace Fulfillment
         public async Task<string> AddTransferAsync(TransferRequestModel transferRequest)
         {
             IsValidTransferRequest(transferRequest);
+            var pendingTransfers = await Transfers.CountAsync();
+            var maxPendingTransfers = int.Parse(configPackage.Settings.Sections["FulfillmentConfig"].Parameters["Fulfillment_MaxTransfersPending"].Value);
+            if (pendingTransfers > maxPendingTransfers)
+            {
+                ServiceEventSource.Current.ServiceMaxPendingLimitHit();
+                throw new MaxPendingTransfersExceededException(pendingTransfers);
+            }
+
             var transferId = await this.Transfers.EnqueueAsync(transferRequest);
             return transferId;
         }
@@ -116,9 +133,12 @@ namespace Fulfillment
                 // runtime can kill us properly.
                 cancellationToken.ThrowIfCancellationRequested();
 
+
+#if DEBUG
                 // Throttle loop: This limit
                 // cannot be removed or you will fail an Audit. 
                 await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+#endif
 
                 using (var tx = this.StateManager.CreateTransaction())
                 {

@@ -2,8 +2,8 @@
     [string]$domain="localhost"
 )
 
-$ordersSvcEndpoint = "http://${domain}:80"
-$fulfillmentSvcEndpoint = "http://${domain}:8080"
+$ordersSvcEndpoint = "http://${domain}:9081"
+$fulfillmentSvcEndpoint = "http://${domain}:9080"
 $bidEndpoint = "${ordersSvcEndpoint}/api/orders/bid"
 $askEndpoint = "${ordersSvcEndpoint}/api/orders/ask"
 $ordersEndpoint = "${ordersSvcEndpoint}/api/orders"
@@ -23,13 +23,7 @@ log "fulfillment endpoint: ${fulfillmentSvcEndpoint}"
 $users = Invoke-RestMethod -Method Get -Uri $usersEndpoint
 if ($users.Count -gt 0)
 {
-    log "found existing users in exchange, if we continue these will be deleted. Do you wish to continue? (y/n)"
-     $continue = Read-Host
-    if ($continue -ne "y" -Or $continue -ne "Y")
-    {
-        log "leaving cluster as is, terminating now"
-        exit
-    }
+   
     foreach ($user in $users)  
     {
         $userId = $user.id
@@ -43,13 +37,7 @@ $startBidCount = $orders.bidsCount
 
 if($startAskCount -gt 0 -Or $startBidCount -gt 0)
 {
-    log "found existing orders in exchange, if we continue these will be deleted. Do you wish to continue? (y/n)"
-     $continue = Read-Host
-    if ($continue -ne "y" -Or $continue -ne "Y")
-    {
-        log "leaving cluster as is, terminating now"
-        exit
-    }
+    
     
     Invoke-RestMethod -Method Delete -Uri $ordersEndpoint
 }

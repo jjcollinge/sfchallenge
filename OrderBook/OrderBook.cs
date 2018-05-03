@@ -83,6 +83,7 @@ namespace OrderBook
             var maxPendingAsks = int.Parse(configPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
             if (currentAsks > maxPendingAsks)
             {
+                ServiceEventSource.Current.ServiceMaxPendingLimitHit();
                 throw new MaxOrdersExceededException(currentAsks);
             }
 
@@ -101,13 +102,14 @@ namespace OrderBook
             var currentBids = await this.bids.CountAsync();
 
             // You have an SLA with management to not allow orders when a backlog of more than 200 are pending
-            // Changing this value with fail a system audit. Other approaches much be used to scale.
+            // Changing this block with fail a system audit. Other approaches much be used to scale.
             var maxPendingBids = int.Parse(configPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxBidsPending"].Value);
-
             if (currentBids > maxPendingBids)
             {
+                ServiceEventSource.Current.ServiceMaxPendingLimitHit();
                 throw new MaxOrdersExceededException(currentBids);
             }
+            // Changes will fail an audit ^
 
             await this.bids.AddOrderAsync(order);
             return order.Id;
@@ -287,10 +289,6 @@ namespace OrderBook
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-
-                // Throttle loop: This limit
-                // cannot be removed or you will fail an Audit. 
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
 
                 // Get the maximum bid and minimum ask
                 var maxBid = this.bids.GetMaxOrder();

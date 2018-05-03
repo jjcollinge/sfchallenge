@@ -231,7 +231,7 @@ namespace UserStore
         /// <returns></returns>
         private async Task<bool> BackupCallbackAsync(BackupInfo backupInfo, CancellationToken cancellationToken)
         {
-            ServiceEventSource.Current.ServiceMessage(this.Context, "Inside backup callback for replica {0}|{1}", this.Context.PartitionId, this.Context.ReplicaId);
+            //ServiceEventSource.Current.ServiceMessage(this.Context, "Inside backup callback for replica {0}|{1}", this.Context.PartitionId, this.Context.ReplicaId);
             long totalBackupCount;
 
             IReliableDictionary<string, long> backupCountDictionary =
@@ -251,19 +251,19 @@ namespace UserStore
                 await backupCountDictionary.SetAsync(tx, "backupCount", ++totalBackupCount);
                 await tx.CommitAsync();
             }
-            ServiceEventSource.Current.Message("Backup count dictionary updated, total backup count is {0}", totalBackupCount);
+            //ServiceEventSource.Current.Message("Backup count dictionary updated, total backup count is {0}", totalBackupCount);
             try
             {
-                ServiceEventSource.Current.ServiceMessage(this.Context, "Archiving backup");
+                //ServiceEventSource.Current.ServiceMessage(this.Context, "Archiving backup");
                 await this.backupStore.ArchiveBackupAsync(backupInfo, cancellationToken);
-                ServiceEventSource.Current.ServiceMessage(this.Context, "Backup archived");
+                //ServiceEventSource.Current.ServiceMessage(this.Context, "Backup archived");
             }
             catch (Exception e)
             {
                 ServiceEventSource.Current.ServiceMessage(this.Context, "Archive of backup failed: Source: {0} Exception: {1}", backupInfo.Directory, e.Message);
             }
             await this.backupStore.DeleteBackupsAsync(cancellationToken);
-            ServiceEventSource.Current.Message("Backups deleted");
+            //ServiceEventSource.Current.Message("Backups deleted");
             return true;
         }
 
@@ -291,7 +291,7 @@ namespace UserStore
                     BackupDescription backupDescription = new BackupDescription(BackupOption.Full, this.BackupCallbackAsync);
                     await this.BackupAsync(backupDescription, TimeSpan.FromHours(1), cancellationToken);
                     backupsTaken++;
-                    ServiceEventSource.Current.ServiceMessage(this.Context, "Backup {0} taken", backupsTaken);
+                    //ServiceEventSource.Current.ServiceMessage(this.Context, "Backup {0} taken", backupsTaken);
                 }
             }
         }

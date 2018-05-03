@@ -12,7 +12,7 @@ namespace Fulfillment.Controllers
     public class TransfersController : Controller
     {
         private Fulfillment fulfillment;
-
+        private static bool IsCoolingDown = false;
         public TransfersController(Fulfillment fulfillment)
         {
             this.fulfillment = fulfillment;
@@ -22,6 +22,10 @@ namespace Fulfillment.Controllers
         [HttpPost]
         public async Task<IActionResult> PostAsync([FromBody] TransferRequestModel transferRequest)
         {
+            if (IsCoolingDown)
+            {
+                return new StatusCodeResult(429);
+            }
             try
             {
                 var transferId = await this.fulfillment.AddTransferAsync(transferRequest);
@@ -30,6 +34,13 @@ namespace Fulfillment.Controllers
             catch (InvalidTransferRequestException ex)
             {
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
+            }
+            catch (MaxPendingTransfersExceededException)
+            {
+                IsCoolingDown = true;
+                await Task.Delay(TimeSpan.FromSeconds(15));
+                IsCoolingDown = false;
+                return new StatusCodeResult(429);
             }
             catch (Exception ex)
             {

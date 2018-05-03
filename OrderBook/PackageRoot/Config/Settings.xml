@@ -2,9 +2,9 @@
 <Settings xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.microsoft.com/2011/01/fabric">
   <!-- Add your custom configuration sections and parameters here -->
   <Section Name="OrderBookConfig">
-    <Parameter Name="Fulfillment_DnsName" Value="[Fulfillment_DnsName]" />
-    <Parameter Name="Fulfillment_Port" Value="[Fulfillment_Port]" />
-    <Parameter Name="MaxBidsPending" Value="[OrderBook_MaxBidsPending]" />
-    <Parameter Name="MaxAsksPending" Value="[OrderBook_MaxAsksPending]" />
+    <Parameter Name="Fulfillment_DnsName" Value="" />
+    <Parameter Name="Fulfillment_Port" Value="" />
+    <Parameter Name="MaxBidsPending" Value="" />
+    <Parameter Name="MaxAsksPending" Value="" />
   </Section>
 </Settings>
