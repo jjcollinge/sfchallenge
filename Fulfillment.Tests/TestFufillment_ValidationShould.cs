@@ -49,7 +49,7 @@ namespace Fulfillment.Tests
         }
 
         [Fact]
-        public void NotThrowIfBuyerNull()
+        public void ThrowIfBuyerNull()
         {
             var askId = "ask1";
             var bidId = "bid1";
@@ -68,7 +68,7 @@ namespace Fulfillment.Tests
         }
 
         [Fact]
-        public void NotThrowIfSellerNull()
+        public void ThrowIfSellerNull()
         {
             var askId = "ask1";
             var bidId = "bid1";
