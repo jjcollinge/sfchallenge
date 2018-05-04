@@ -34,6 +34,12 @@ namespace Logger
             Init();
         }
 
+        public Logger(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
+            : base(context, reliableStateManagerReplica)
+        {
+            Init();
+        }
+
         private void Init()
         {
             ConfigurationPackage configPackage = this.Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
@@ -65,12 +71,16 @@ namespace Logger
                 await transferLogger.ClearAsync();
 
                 // Clear the queue
-                while (exportQueue.Count > 0)
-                {
-
-                }
-                await exportQueue.TryDequeueAsync();
-                await tx.CommitAsync();
+                var t = Task.Run(async () => {
+                    while (exportQueue.Count > 0)
+                    {
+                        await exportQueue.TryDequeueAsync(tx);
+                    }
+                    await tx.CommitAsync();
+                    return true;
+                });
+                var timeout = Task.Delay(TimeSpan.FromSeconds(60));
+                await Task.WhenAny(t, timeout);
             }
         }
 

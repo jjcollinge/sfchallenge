@@ -18,11 +18,11 @@ namespace OrderBook.Tests
             //Build ConfigurationSettings
             var configSettings = CreateConfigurationSettings(configSections);
 
-            //add one ConfigurationSection
+            //add ConfigurationSection
             ConfigurationSection configSection = CreateConfigurationSection("OrderBookConfig");
             configSections.Add(configSection);
 
-            //add one Parameters entry
+            //add Parameters entry
             ConfigurationProperty maxAsksParam = CreateConfigurationSectionParameters("MaxAsksPending", "200");
             configSection.Parameters.Add(maxAsksParam);
 
@@ -34,6 +34,13 @@ namespace OrderBook.Tests
 
             ConfigurationProperty orderBookPort = CreateConfigurationSectionParameters("Fulfillment_Port", "8080");
             configSection.Parameters.Add(orderBookPort);
+
+            //add  ConfigurationSection
+            ConfigurationSection configSection2 = CreateConfigurationSection("CosmosDB");
+            configSections.Add(configSection2);
+
+            ConfigurationProperty cosmosDBConnectionString = CreateConfigurationSectionParameters("ConnectionString", "");
+            configSection2.Parameters.Add(cosmosDBConnectionString);
 
             //Build ConfigurationPackage
             ConfigurationPackage configPackage = CreateConfigurationPackage(configSettings);
