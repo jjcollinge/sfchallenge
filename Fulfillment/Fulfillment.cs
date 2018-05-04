@@ -133,13 +133,6 @@ namespace Fulfillment
                 // runtime can kill us properly.
                 cancellationToken.ThrowIfCancellationRequested();
 
-
-#if DEBUG
-                // Throttle loop: This limit
-                // cannot be removed or you will fail an Audit. 
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
-#endif
-
                 using (var tx = this.StateManager.CreateTransaction())
                 {
                     Transfer transfer = null;

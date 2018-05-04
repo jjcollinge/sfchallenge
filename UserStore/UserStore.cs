@@ -107,7 +107,7 @@ namespace UserStore
                 var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
                 if (current.HasValue)
                 {
-                    await UpdateUserAsync(user);
+                    await ExecuteUserUpdate(user, users, tx);
                     return user.Id;
                 }
                 await users.AddAsync(tx, user.Id, user);
@@ -123,20 +123,25 @@ namespace UserStore
 
             using (var tx = this.StateManager.CreateTransaction())
             {
-                bool result;
-                var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
-                if (current.HasValue)
-                {
-                    result = await users.TryUpdateAsync(tx, user.Id, user, current.Value);
-                    await tx.CommitAsync();
-                }
-                else
-                {
-                    throw new ApplicationException($"Cannot update non existent user '{user.Id}'");
-                }
-
-                return result;
+                return await ExecuteUserUpdate(user, users, tx);
             }
+        }
+
+        private static async Task<bool> ExecuteUserUpdate(User user, IReliableDictionary<string, User> users, ITransaction tx)
+        {
+            bool result;
+            var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
+            if (current.HasValue)
+            {
+                result = await users.TryUpdateAsync(tx, user.Id, user, current.Value);
+                await tx.CommitAsync();
+            }
+            else
+            {
+                throw new ApplicationException($"Cannot update non existent user '{user.Id}'");
+            }
+
+            return result;
         }
 
         public async Task<bool> DeleteUserAsync(string userId)
