@@ -24,7 +24,7 @@
     <Parameter Name="OrderBook_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="OrderBook_PartitionCount" DefaultValue="1" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" DefaultValue="3" />
-    <!--You have an SLA with management to not allow orders when a backlog of more than 200 are pending -->
+    <!--You have an SLA with management to block new orders when 200 existing orders are pending -->
     <!--Changing this value with fail a system audit. Other approaches much be used to scale -->
     <Parameter Name="OrderBook_MaxBidsPending" DefaultValue="200" />
     <Parameter Name="OrderBook_MaxAsksPending" DefaultValue="200" />

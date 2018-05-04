@@ -287,6 +287,7 @@ namespace OrderBook
                         Ask = match,
                         Bid = maxBid,
                     };
+
                     // Send the transfer to our fulfillment
                     // service for fulfillment.
                     var content = new StringContent(JsonConvert.SerializeObject(transfer), Encoding.UTF8, "application/json");
