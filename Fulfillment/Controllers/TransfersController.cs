@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Fabric;
 using System.Linq;
 using System.Threading.Tasks;
 using Common;
@@ -31,9 +32,12 @@ namespace Fulfillment.Controllers
             {
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
-            catch (Exception ex)
+            catch (FabricNotPrimaryException)
             {
-                ServiceEventSource.Current.ServiceMessage(fulfillment.Context, "Failed completing transfer..", transferRequest, ex);
+                return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
+            }
+            catch (FabricException)
+            {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
         }
@@ -41,8 +45,15 @@ namespace Fulfillment.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAsync()
         {
-            var count = await this.fulfillment.GetTransfersCountAsync();
-            return this.Ok(count);
+            try
+            {
+                var count = await this.fulfillment.GetTransfersCountAsync();
+                return this.Ok(count);
+            }
+            catch (FabricException)
+            {
+                return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
+            }
         }
     }
 }

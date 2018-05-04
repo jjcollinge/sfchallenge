@@ -40,7 +40,7 @@ namespace OrderBook.Controllers
                 };
                 return this.Json(view);
             }
-            catch (Exception)
+            catch (FabricException)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
@@ -49,8 +49,19 @@ namespace OrderBook.Controllers
         [HttpDelete]
         public async Task<IActionResult> DeleteAsync()
         {
-            await this.orderBook.ClearAllOrders();
-            return this.Ok();
+            try
+            {
+                await this.orderBook.ClearAllOrders();
+                return this.Ok();
+            }
+            catch (FabricNotPrimaryException)
+            {
+                return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
+            }
+            catch (FabricException)
+            {
+                return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
+            }
         }
 
         [Route("bids")]
@@ -66,7 +77,7 @@ namespace OrderBook.Controllers
             {
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
-            catch (Exception)
+            catch (FabricException)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
@@ -81,7 +92,7 @@ namespace OrderBook.Controllers
                 var bids = await this.orderBook.GetAsksAsync();
                 return this.Json(bids);
             }
-            catch (Exception)
+            catch (FabricException)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
@@ -100,6 +111,10 @@ namespace OrderBook.Controllers
             {
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
+            catch (MaxOrdersExceededException)
+            {
+                return new StatusCodeResult(429);
+            }
             catch (FabricNotPrimaryException)
             {
                 return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
@@ -107,10 +122,6 @@ namespace OrderBook.Controllers
             catch (FabricException)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
-            }
-            catch (MaxOrdersExceededException )
-            {
-                return new StatusCodeResult(429);
             }
         }
 
@@ -127,6 +138,10 @@ namespace OrderBook.Controllers
             {
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
+            catch (MaxOrdersExceededException)
+            {
+                return new StatusCodeResult(429);
+            }
             catch (FabricNotPrimaryException)
             {
                 return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
@@ -134,10 +149,6 @@ namespace OrderBook.Controllers
             catch (FabricException)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
-            }
-            catch (MaxOrdersExceededException)
-            {
-                return new StatusCodeResult(429);
             }
         }
     }

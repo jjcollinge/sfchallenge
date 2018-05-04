@@ -43,8 +43,8 @@ namespace Logger
 
         public async Task LogAsync(Transfer transfer)
         {
-            IReliableQueue<Transfer> exportQueue =
-             await this.StateManager.GetOrAddAsync<IReliableQueue<Transfer>>(QueueName);
+            IReliableConcurrentQueue<Transfer> exportQueue =
+             await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Transfer>>(QueueName);
 
             using (var tx = this.StateManager.CreateTransaction())
             {
@@ -56,8 +56,8 @@ namespace Logger
 
         public async Task ClearAsync()
         {
-            IReliableQueue<Transfer> exportQueue =
-             await this.StateManager.GetOrAddAsync<IReliableQueue<Transfer>>(QueueName);
+            IReliableConcurrentQueue<Transfer> exportQueue =
+             await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Transfer>>(QueueName);
 
             using (var tx = this.StateManager.CreateTransaction())
             {
@@ -65,7 +65,11 @@ namespace Logger
                 await transferLogger.ClearAsync();
 
                 // Clear the queue
-                await exportQueue.ClearAsync();
+                while (exportQueue.Count > 0)
+                {
+
+                }
+                await exportQueue.TryDequeueAsync();
                 await tx.CommitAsync();
             }
         }
@@ -74,8 +78,8 @@ namespace Logger
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            IReliableQueue<Transfer> exportQueue =
-             await this.StateManager.GetOrAddAsync<IReliableQueue<Transfer>>(QueueName);
+            IReliableConcurrentQueue<Transfer> exportQueue =
+             await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Transfer>>(QueueName);
 
             // Take each transfer from the queue and
             // insert it into an external transfer
@@ -84,6 +88,7 @@ namespace Logger
             {
                 using (var tx = this.StateManager.CreateTransaction())
                 {
+                    // This can be batched...
                     var result = await exportQueue.TryDequeueAsync(tx);
                     if (result.HasValue)
                     {

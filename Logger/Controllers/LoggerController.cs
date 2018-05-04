@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Fabric;
 using System.Linq;
 using System.Threading.Tasks;
 using Common;
@@ -27,7 +28,11 @@ namespace Logger.Controllers
                 await this.logger.LogAsync(transfer);
                 return this.Ok();
             }
-            catch (Exception)
+            catch (FabricNotPrimaryException)
+            {
+                return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
+            }
+            catch (FabricException)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
