@@ -3,5 +3,7 @@
   <Section Name="FulfillmentConfig">
     <Parameter Name="OrderBook_DnsName" Value="[OrderBook_DnsName]" />
     <Parameter Name="OrderBook_Port" Value="[OrderBook_Port]" />
+    <Parameter Name="Logger_DnsName" Value="[Logger_DnsName]" />
+    <Parameter Name="Logger_Port" Value="[Logger_Port]" />
   </Section>
 </Settings>

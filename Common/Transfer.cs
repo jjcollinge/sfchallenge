@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MongoDB.Bson.Serialization.Attributes;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -12,6 +13,7 @@ namespace Common
     /// exchange the goods and value
     /// between each party.
     /// </summary>
+    [BsonIgnoreExtraElements]
     [DataContract]
     public sealed class Transfer : IEquatable<Transfer>
     {
@@ -22,10 +24,13 @@ namespace Common
             Bid = bid;
         }
 
+        [BsonElement(elementName: "transferId")]
         [DataMember]
         public readonly string Id;
+        [BsonElement(elementName: "ask")]
         [DataMember]
         public readonly Order Ask;
+        [BsonElement(elementName: "bid")]
         [DataMember]
         public readonly Order Bid;
 

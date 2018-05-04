@@ -96,7 +96,7 @@ namespace OrderBook
             IReliableDictionary<string, Order> orders =
                 await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
 
-            this.SecondaryIndex.Clear();
+            this.SecondaryIndex = this.SecondaryIndex.Clear();
             using (ITransaction tx = this.stateManager.CreateTransaction())
             {
                 await orders.ClearAsync();
@@ -216,6 +216,23 @@ namespace OrderBook
         }
 
         /// <summary>
+        /// Checks for the existence of a provided
+        /// key in the dictionary
+        /// </summary>
+        /// <param name="orderId"></param>
+        /// <returns></returns>
+        public async Task<bool> ContainsAsync(string orderId)
+        {
+            IReliableDictionary<string, Order> orders =
+                await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
+
+            using (var tx = this.stateManager.CreateTransaction())
+            {
+                return await orders.ContainsKeyAsync(tx, orderId);
+            }
+        }
+
+        /// <summary>
         /// Called in response to a change on the state manager 
         /// </summary>
         /// <param name="sender"></param>
@@ -290,7 +307,7 @@ namespace OrderBook
              IReliableDictionary<string, Order> origin,
              NotifyDictionaryRebuildEventArgs<string, Order> rebuildNotification)
         {
-            this.SecondaryIndex.Clear();
+            this.SecondaryIndex = this.SecondaryIndex.Clear();
 
             var enumerator = rebuildNotification.State.GetAsyncEnumerator();
             while (await enumerator.MoveNextAsync(CancellationToken.None))

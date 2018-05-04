@@ -13,7 +13,7 @@ namespace OrderBook.Tests
         [Fact]
         public void ReturnTwoAsksThatSumsIsEqualToOrGreaterThanOriginal()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
@@ -31,7 +31,7 @@ namespace OrderBook.Tests
         [Fact]
         public void ReturnTwoAsksThatSumsIsGreaterThanTheOriginalByTheSpreadOfTheBid()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
@@ -48,7 +48,7 @@ namespace OrderBook.Tests
         [Fact]
         public void ReturnAMatchAndNullWhenAskEqualsBid()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
@@ -64,7 +64,7 @@ namespace OrderBook.Tests
         [Fact]
         public void ThrowIfValueIsZero()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
@@ -76,7 +76,7 @@ namespace OrderBook.Tests
         [Fact]
         public void ThrowIfQuantityIsZero()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
