@@ -36,11 +36,11 @@ namespace Fulfillment
         {
             if (seller == null)
             {
-                throw new BadSellerException($"Matched seller '{seller.Id}' doesn't exist");
+                throw new BadSellerException($"Matched seller doesn't exist");
             }
             if (buyer == null)
             {
-                throw new BadBuyerException($"Matched seller '{buyer.Id}' doesn't exist");
+                throw new BadBuyerException($"Matched seller doesn't exist");
             }
             if (seller.Quantity < transfer.Bid.Quantity)
             {
