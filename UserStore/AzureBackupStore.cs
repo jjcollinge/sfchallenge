@@ -31,7 +31,7 @@ namespace UserStore
             this.keyMax = keymax;
 
             string backupAccountName = configSection.Parameters["BackupAccountName"].Value;
-            string backupAccountKey = configSection.Parameters["PrimaryKeyForBackupTestAccount"].Value;
+            string backupAccountKey = configSection.Parameters["PrimaryKeyForBackupAccount"].Value;
             string blobEndpointAddress = configSection.Parameters["BlobServiceEndpointAddress"].Value;
 
             this.backupFrequencyInSeconds = long.Parse(configSection.Parameters["BackupFrequencyInSeconds"].Value);

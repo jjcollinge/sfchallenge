@@ -42,7 +42,8 @@ namespace OrderBook
         private static readonly HttpClient client = new HttpClient();
         private string fulfillmentEndpoint;
 
-        public ConfigurationPackage configPackage { get; private set; }
+        private int maxPendingAsks;
+        private int maxPendingBids;
 
         public OrderBook(StatefulServiceContext context)
             : base(context)
@@ -50,7 +51,6 @@ namespace OrderBook
             Init();
             this.asks = new OrderSet(this.StateManager, AskBookName);
             this.bids = new OrderSet(this.StateManager, BidBookName);
-
         }
 
         // This constructor is used during unit testing by setting a mock
@@ -65,7 +65,15 @@ namespace OrderBook
 
         private void Init()
         {
-            configPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
+            // Get configuration from our PackageRoot/Config/Setting.xml file
+            var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
+            var dnsName = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Fulfillment_DnsName"].Value;
+            var port = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Fulfillment_Port"].Value;
+
+            fulfillmentEndpoint = $"http://{dnsName}:{port}";
+
+            maxPendingAsks = int.Parse(configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
+            maxPendingBids = int.Parse(configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
         }
 
         /// <summary>
@@ -75,12 +83,11 @@ namespace OrderBook
         /// <returns></returns>
         public async Task<string> AddAskAsync(Order order)
         {
-            IsValidOrder(order);
+            Validation.ThrowIfNotValidOrder(order);
             var currentAsks = await asks.CountAsync();
 
             // You have an SLA with management to not allow orders when a backlog of more than 200 are pending
             // Changing this value with fail a system audit. Other approaches much be used to scale.
-            var maxPendingAsks = int.Parse(configPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
             if (currentAsks > maxPendingAsks)
             {
                 ServiceEventSource.Current.ServiceMaxPendingLimitHit();
@@ -98,12 +105,11 @@ namespace OrderBook
         /// <returns></returns>
         public async Task<string> AddBidAsync(Order order)
         {
-            IsValidOrder(order);
+            Validation.ThrowIfNotValidOrder(order);
             var currentBids = await this.bids.CountAsync();
 
             // You have an SLA with management to not allow orders when a backlog of more than 200 are pending
-            // Changing this block with fail a system audit. Other approaches much be used to scale.
-            var maxPendingBids = int.Parse(configPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxBidsPending"].Value);
+            // Changing this value with fail a system audit. Other approaches much be used to scale.
             if (currentBids > maxPendingBids)
             {
                 ServiceEventSource.Current.ServiceMaxPendingLimitHit();
@@ -207,30 +213,157 @@ namespace OrderBook
         }
 
         /// <summary>
-        /// Checks whether a given order meets
-        /// the validity criteria. Throws
-        /// InvalidOrderException if it doesn't.
+        /// RunAsync is called by the Service Fabric runtime once the service is ready
+        /// to begin processing.
+        /// We use it select the maximum bid and minimum ask. We then
+        /// pair these in a match and hand them over to the fulfilment
+        /// service to process the trade of goods.
         /// </summary>
-        /// <param name="order"></param>
-        private void IsValidOrder(Order order)
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        protected override async Task RunAsync(CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(order.Id))
+            client.DefaultRequestHeaders
+                  .Accept
+                  .Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+            var maxAttempts = 5;
+            var attempts = 0;
+
+            while (true)
             {
-                throw new InvalidOrderException("Order Id cannot be null, empty or contain whitespace");
-            }
-            if (string.IsNullOrWhiteSpace(order.UserId))
-            {
-                throw new InvalidOrderException("Order cannot have a null or invalid user id");
-            }
-            if (order.Quantity == 0)
-            {
-                throw new InvalidOrderException("Order cannot have 0 quantity");
-            }
-            if (order.Value == 0)
-            {
-                throw new InvalidOrderException("Order cannot have 0 value");
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Get the maximum bid and minimum ask
+                var maxBid = this.bids.GetMaxOrder();
+                var minAsk = this.asks.GetMinOrder();
+
+                // Check if match
+                if (IsMatch(maxBid, minAsk))
+                {
+                    ServiceEventSource.Current.ServiceMessage(this.Context, $"New match: order {maxBid.Id} and order {minAsk.Id}");
+                    Order match = null;
+
+                    // In this exchange, the trade is fulfilled at
+                    // the value the buyer is willing to pay. Therefore,
+                    // the seller may get more value than they were 
+                    // willing to accept.
+
+                    // We split the ask incase the seller had a bigger
+                    // quantity of goods than the buyer wished to bid for.
+                    // The cost per unit is kept consistent between the
+                    // original ask and any left over asks.
+                    try
+                    {
+                        (var matchingAsk, var leftOverAsk) = SplitAsk(maxBid, minAsk);
+                        if (leftOverAsk != null)
+                        {
+                            await AddAskAsync(leftOverAsk); // Add the left over ask as a new order
+                        }
+                        match = matchingAsk;
+                    }
+                    catch (InvalidAskException)
+                    {
+                        // The ask did not meet our validation criteria.
+                        // The bid may still be valid so we'll leave it.
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid Asks generated from {minAsk.Id}, dropping.");
+                        await this.asks.RemoveAsync(minAsk);
+                        continue;
+                    }
+                    catch (InvalidBidException)
+                    {
+                        // The bid did not meet our validation criteria.
+                        // The ask may still be valid so we'll leave it.
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid Bids generated from {maxBid.Id}, dropping.");
+                        await this.bids.RemoveAsync(maxBid);
+                        continue;
+                    }
+
+                    // Build a trade containing the matched
+                    // ask and bid.
+                    var trade = new TradeRequestModel
+                    {
+                        Ask = match,
+                        Bid = maxBid,
+                    };
+
+                    // Send the trade to our fulfillment
+                    // service for fulfillment.
+                    var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
+                    HttpResponseMessage res = null;
+                    try
+                    {
+                        res = await client.PostAsync($"{fulfillmentEndpoint}/api/trades", content);
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        // Exception thrown when attempting to make HTTP POST
+                        // to fulfillment API. Possibly a DNS, network connectivity
+                        // or timeout issue.
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Error sending trade to fulfillment service, error: '{ex.Message}'");
+
+                        // Log the error and retry after a given delay
+                        attempts++;
+                        if (attempts >= maxAttempts)
+                        {
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Attempts to send trade to fulfillment service limit {maxAttempts} exceeded, terminating with error.");
+                            throw new Exception("OrderBook cannot contact Fulfillment service.");
+                        }
+                        await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                        continue;
+                    }
+                    catch (Exception ex)
+                    {
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Error thrown whilst calling fulfillment service, error: '{ex.Message}'. terminating now with error");
+                        throw ex;
+                    }
+                    // If the response is successful, assume
+                    // trade is safe to remove.
+                    if (res.IsSuccessStatusCode)
+                    {
+                        using (var tx = this.StateManager.CreateTransaction())
+                        {
+                            var removedAsk = await this.asks.RemoveAsync(tx, minAsk);
+                            var removedBid = await this.bids.RemoveAsync(tx, maxBid);
+                            if (removedAsk && removedBid)
+                            {
+                                // Committing our transaction will remove both the ask and the bid
+                                // from our orders.
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Removed Ask {minAsk.Id} and Bid {maxBid.Id}");
+                                await tx.CommitAsync();
+
+                                var tradeId = await res.Content.ReadAsStringAsync();
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Created new trade with id '{tradeId}'");
+                            }
+                            else
+                            {
+                                // Abort the transaction to ensure both the ask and the bid
+                                // stay in our orders.
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Failed to remove orders, so requeuing");
+                                tx.Abort();
+                                continue;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Error response from fulfillment service, likely a transient error
+                        // so we'll back off and try again shortly.
+                        attempts++;
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Error response from fulfillment service #{attempts}: Response code {res.StatusCode}");
+
+                        if (attempts >= maxAttempts)
+                        {
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Attempts to send trade to fulfillment service limit {maxAttempts} exceeded, terminating with error.");
+                            throw new Exception("OrderBook failed to send trade to fulfillment service.");
+                        }
+                        await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                        continue;
+                    }
+                }
             }
         }
+
 
         /// <summary>
         /// Optional override to create listeners (like tcp, http) for this service instance.
@@ -259,146 +392,6 @@ namespace OrderBook
                     }),
                     listenOnSecondary: true)
             };
-        }
-
-        /// <summary>
-        /// RunAsync is called by the Service Fabric runtime once the service is ready
-        /// to begin processing.
-        /// We use it select the maximum bid and minimum ask. We then
-        /// pair these in a match and hand them over to the fulfilment
-        /// service to process the transfer of goods.
-        /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        protected override async Task RunAsync(CancellationToken cancellationToken)
-        {
-            // Get configuration from our setting.xml file
-            var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
-            var dnsName = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Fulfillment_DnsName"].Value;
-            var port = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Fulfillment_Port"].Value;
-
-            fulfillmentEndpoint = $"http://{dnsName}:{port}";
-
-            client.DefaultRequestHeaders
-                  .Accept
-                  .Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-            var maxAttempts = 5;
-            var attempts = 0;
-
-            while (true)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                // Get the maximum bid and minimum ask
-                var maxBid = this.bids.GetMaxOrder();
-                var minAsk = this.asks.GetMinOrder();
-
-                // Check if match
-                if (IsMatch(maxBid, minAsk))
-                {
-                    ServiceEventSource.Current.ServiceMessage(this.Context, $"New match: order {maxBid.Id} and order {minAsk.Id}");
-                    Order match = null;
-                    try
-                    {
-                        // In this exchange, the transfer is fulfilled at
-                        // the value the buyer is willing to pay. Therefore,
-                        // the seller may get more value than they were 
-                        // willing to accept.
-
-                        // We split the ask incase the seller had a bigger
-                        // quantity of goods than the buyer wished to bid for.
-                        // The cost per unit is kept consistent between the
-                        // original ask and any left over asks.
-                        (var matchingAsk, var leftOverAsk) = SplitAsk(maxBid, minAsk);
-                        if (leftOverAsk != null)
-                        {
-                            // Add the left over ask as a new order
-                            await AddAskAsync(leftOverAsk);
-                        }
-                        match = matchingAsk;
-                    }
-                    catch (InvalidAskException)
-                    {
-                        // The ask did not meet our validation criteria.
-                        // The bid may still be valid so we'll leave it.
-                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid Asks generated from {minAsk.Id}, dropping.");
-                        await this.asks.RemoveAsync(minAsk);
-                        continue;
-                    }
-                    catch (InvalidBidException)
-                    {
-                        // The bid did not meet our validation criteria.
-                        // The ask may still be valid so we'll leave it.
-                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid Bids generated from {maxBid.Id}, dropping.");
-                        await this.bids.RemoveAsync(maxBid);
-                        continue;
-                    }
-
-                    // Build a transfer containing the matched
-                    // ask and bid.
-                    var transfer = new TransferRequestModel
-                    {
-                        Ask = match,
-                        Bid = maxBid,
-                    };
-                    // Send the transfer to our fulfillment
-                    // service for fulfillment.
-                    var content = new StringContent(JsonConvert.SerializeObject(transfer), Encoding.UTF8, "application/json");
-                    HttpResponseMessage res;
-                    try
-                    {
-                        res = await client.PostAsync($"{fulfillmentEndpoint}/api/transfers", content);
-                    }
-                    catch (Exception ex)
-                    {
-                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Error sending transfer to fulfillment service. Error: '{ex.Message}'. Aborting match", ex);
-                        continue;
-                    }
-                    // If the response is successful, assume
-                    // transfer is safe to remove.
-                    if (res.IsSuccessStatusCode)
-                    {
-                        using (var tx = this.StateManager.CreateTransaction())
-                        {
-                            var removedAsk = await this.asks.RemoveAsync(tx, minAsk);
-                            var removedBid = await this.bids.RemoveAsync(tx, maxBid);
-                            if (removedAsk && removedBid)
-                            {
-                                // Committing our transaction will remove both the ask and the bid
-                                // from our orders.
-                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Removed Ask {minAsk.Id} and Bid {maxBid.Id}");
-                                await tx.CommitAsync();
-
-                                var transferId = await res.Content.ReadAsStringAsync();
-                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Created new transfer with id '{transferId}'");
-                            }
-                            else
-                            {
-                                // Abort the transaction to ensure both the ask and the bid
-                                // stay in our orders.
-                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Failed to remove orders, so requeuing");
-                                tx.Abort();
-                                continue;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Exception calling fulfillment service, likely a transient error
-                        // so we'll back off and try again shortly.
-                        attempts++;
-                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Attempt to send transfer to Fulfillment service #{attempts}: Response code {res.StatusCode}");
-
-                        if (attempts >= maxAttempts)
-                        {
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Attempts limit {maxAttempts} exceeded, terminating with error.");
-                            throw new Exception("OrderBook cannot contact Fulfillment service.");
-                        }
-                        await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
-                    }
-                }
-            }
         }
     }
 }

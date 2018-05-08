@@ -7,7 +7,7 @@ $fulfillmentSvcEndpoint = "http://${domain}:9080"
 $bidEndpoint = "${ordersSvcEndpoint}/api/orders/bid"
 $askEndpoint = "${ordersSvcEndpoint}/api/orders/ask"
 $ordersEndpoint = "${ordersSvcEndpoint}/api/orders"
-$transfersEndpoint = "${fulfillmentSvcEndpoint}/api/transfers"
+$transfersEndpoint = "${fulfillmentSvcEndpoint}/api/trades"
 $usersEndpoint = "${fulfillmentSvcEndpoint}/api/users"
 
 function log
@@ -70,11 +70,8 @@ if ($sellerId -eq "")
     exit
 }
 
-# Allow time for users to be created
-Sleep(2)
-
 log "begin adding orders"
-$runCount = 1000
+$runCount = 50
 for ($i = 0; $i -lt $runCount; $i++)
 {
     # Create bid
@@ -106,11 +103,15 @@ for ($i = 0; $i -lt $runCount; $i++)
     }
 }
 
+# Delay long enough for atleast 1 transfer to get to the queue
+Write-Host "Waiting for transfers to start flowing through"
+Start-Sleep -Seconds 10
+
 $transfers = Invoke-RestMethod -Method Get -Uri $transfersEndpoint
 while ($transfers -ne 0)
 {
     $transfers = Invoke-RestMethod -Method Get -Uri $transfersEndpoint
-    log "transfer count: ${transfers}"
+    log "transfers currently in queue: ${transfers}"
     Start-Sleep -Seconds 5
 }
 log "finished processing orders"

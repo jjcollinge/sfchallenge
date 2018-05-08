@@ -12,9 +12,9 @@ namespace UserStore.Tests
         [Fact]
         public void Serialize_Deserialize()
         {
-            var user = new User("42", "Anders", 42, 128, new List<Transfer>()
+            var user = new User("42", "Anders", 42, 128, new List<string>()
                 {
-                    new Transfer("t1", new Order("o1", 10, 1, "userId"), new Order("o2", 20, 2, "userId")),
+                    "t1"
                 });
 
             var serializer = new DataContractSerializer(typeof(User));
@@ -28,7 +28,7 @@ namespace UserStore.Tests
             }
 
             Assert.Equal(user.Username, userDeserialized.Username);
-            Assert.Equal(user.Transfers.Count(), userDeserialized.Transfers.Count());
+            Assert.Equal(user.TradeIds.Count(), userDeserialized.TradeIds.Count());
         }
 
         [Fact]
@@ -36,9 +36,9 @@ namespace UserStore.Tests
         {
             var users = new List<User>()
             {
-                new User("42", "Anders", 42, 128, new List<Transfer>()
+                new User("42", "Anders", 42, 128, new List<string>()
                 {
-                    new Transfer("t1", new Order("o1", 10, 1, "userId"), new Order("o2", 20, 2, "userId")),
+                    "t1"
                 }),
                 new User("43", "Joni", 21, 455, null),
             };

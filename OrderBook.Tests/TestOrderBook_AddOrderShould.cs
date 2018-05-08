@@ -20,9 +20,7 @@ namespace OrderBook.Tests
         public async Task AddValidAskToDictionary()
         {
             var stateManager = new MockReliableStateManager();
-
-            var context = GetMockContext();
-
+            var context = Helpers.GetMockContext();
             var service = new OrderBook(context, stateManager);
 
             var ask = new Order("user1", 100, 30, "buyer");
@@ -45,9 +43,7 @@ namespace OrderBook.Tests
         public async Task AddAskToFullDictionary_ExpectMaxOrderExceededException()
         {
             var stateManager = new MockReliableStateManager();
-
-            var context = GetMockContext();
-
+            var context = Helpers.GetMockContext();
             var service = new OrderBook(context, stateManager);
 
             await Assert.ThrowsAsync<MaxOrdersExceededException>(async () =>
@@ -71,7 +67,7 @@ namespace OrderBook.Tests
         [Fact]
         public async Task ThrowIfInvalidUserIdInOrder()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
@@ -82,7 +78,7 @@ namespace OrderBook.Tests
         [Fact]
         public async Task ThrowIfZeroQuantityOrder()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
@@ -93,7 +89,7 @@ namespace OrderBook.Tests
         [Fact]
         public async Task ThrowIfZeroValueOrder()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
@@ -101,44 +97,5 @@ namespace OrderBook.Tests
             await Assert.ThrowsAsync<InvalidOrderException>(() => service.AddAskAsync(ask));
         }
 
-
-        private static StatefulServiceContext GetMockContext()
-        {
-            //build ConfigurationSectionCollection
-            var configSections = new ConfigurationSectionCollection();
-
-            //Build ConfigurationSettings
-            var configSettings = CreateConfigurationSettings(configSections);
-
-            //add one ConfigurationSection
-            ConfigurationSection configSection = CreateConfigurationSection("OrderBookConfig");
-            configSections.Add(configSection);
-
-            //add one Parameters entry
-            ConfigurationProperty maxAsksParam = CreateConfigurationSectionParameters("MaxAsksPending", "200");
-            configSection.Parameters.Add(maxAsksParam);
-
-            ConfigurationProperty maxBidsPending = CreateConfigurationSectionParameters("MaxBidsPending", "200");
-            configSection.Parameters.Add(maxBidsPending);
-
-            //Build ConfigurationPackage
-            ConfigurationPackage configPackage = CreateConfigurationPackage(configSettings);
-            var context = new MockCodePackageActivationContext(
-                "fabric:/MockApp",
-                "MockAppType",
-                "Code",
-                "1.0.0.0",
-                Guid.NewGuid().ToString(),
-                @"C:\logDirectory",
-                @"C:\tempDirectory",
-                @"C:\workDirectory",
-                "ServiceManifestName",
-                "1.0.0.0")
-            {
-                ConfigurationPackage = configPackage
-            };
-
-            return MockStatefulServiceContextFactory.Create(context, "barry", new Uri("fabric:/barry/norman"), Guid.NewGuid(), 1);
-        }
-    }
+   }
 }

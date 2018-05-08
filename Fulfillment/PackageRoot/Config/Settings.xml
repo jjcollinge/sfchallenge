@@ -3,6 +3,7 @@
   <Section Name="FulfillmentConfig">
     <Parameter Name="OrderBook_DnsName" Value="" />
     <Parameter Name="OrderBook_Port" Value="" />
-    <Parameter Name="Fulfillment_MaxTransfersPending" Value=""/>
+    <Parameter Name="Logger_DnsName" Value="" />
+    <Parameter Name="Logger_Port" Value="" />
   </Section>
 </Settings>

@@ -8,36 +8,36 @@ using System.Threading.Tasks;
 
 namespace Fulfillment
 {
-    public class TransferQueue
+    public class TradeQueue
     {
         private string queueName = "";
         private IReliableStateManager stateManager;
 
-        public TransferQueue(IReliableStateManager stateManager, string queueName)
+        public TradeQueue(IReliableStateManager stateManager, string queueName)
         {
             this.stateManager = stateManager;
             this.queueName = queueName;
         }
 
-        public async Task<string> EnqueueAsync(Transfer transfer)
+        public async Task<string> EnqueueAsync(Trade trade)
         {
-            IReliableConcurrentQueue<Transfer> transfers =
-             await this.stateManager.GetOrAddAsync<IReliableConcurrentQueue<Transfer>>(queueName);
+            IReliableConcurrentQueue<Trade> trades =
+             await this.stateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(queueName);
 
             using (var tx = this.stateManager.CreateTransaction())
             {
-                await transfers.EnqueueAsync(tx, transfer);
+                await trades.EnqueueAsync(tx, trade);
                 await tx.CommitAsync();
             }
-            return transfer.Id;
+            return trade.Id;
         }
 
-        public async Task<Transfer> DequeueAsync(ITransaction tx)
+        public async Task<Trade> DequeueAsync(ITransaction tx)
         {
-            IReliableConcurrentQueue<Transfer> transactions =
-             await this.stateManager.GetOrAddAsync<IReliableConcurrentQueue<Transfer>>(queueName);
+            IReliableConcurrentQueue<Trade> transactions =
+             await this.stateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(queueName);
 
-            Transfer transaction = null;
+            Trade transaction = null;
             var result = await transactions.TryDequeueAsync(tx);
             if (result.HasValue)
             {
@@ -48,8 +48,8 @@ namespace Fulfillment
 
         public async Task<long> CountAsync()
         {
-            IReliableConcurrentQueue<Transfer> transactions =
-                await this.stateManager.GetOrAddAsync<IReliableConcurrentQueue<Transfer>>(queueName);
+            IReliableConcurrentQueue<Trade> transactions =
+                await this.stateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(queueName);
 
             return transactions.Count;
         }

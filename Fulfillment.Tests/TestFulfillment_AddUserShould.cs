@@ -10,7 +10,7 @@ namespace Fulfillment.Tests
         [Fact]
         public async Task ThrowIfUsernameIsNullOrWhitespace()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
 
@@ -24,7 +24,7 @@ namespace Fulfillment.Tests
                 Username = username,
             };
 
-            await Assert.ThrowsAsync<InvalidTransferRequestException>(() => service.AddUserAsync(request));
+            await Assert.ThrowsAsync<InvalidTradeRequestException>(() => service.AddUserAsync(request));
         }
     }
 }

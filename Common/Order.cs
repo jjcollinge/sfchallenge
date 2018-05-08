@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using MongoDB.Bson.Serialization.Attributes;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,6 +8,7 @@ using System.Threading.Tasks;
 
 namespace Common
 {
+    [BsonIgnoreExtraElements]
     [DataContract]
     public class Order : IComparable<Order>, IComparer<Order>, IEquatable<Order>
     {
@@ -60,19 +62,19 @@ namespace Common
             Timestamp = DateTime.UtcNow;
         }
 
-        [JsonProperty]
+        [BsonElement(elementName: "orderId")]
         [DataMember]
         public readonly string Id;
-        [JsonProperty]
+        [BsonElement(elementName: "userId")]
         [DataMember]
         public readonly string UserId;
-        [JsonProperty]
+        [BsonElement(elementName: "value")]
         [DataMember]
         public readonly uint Value;
-        [JsonProperty]
+        [BsonElement(elementName: "quantity")]
         [DataMember]
         public readonly uint Quantity;
-        [JsonProperty]
+        [BsonElement(elementName: "timestamp")]
         [DataMember]
         public readonly DateTime Timestamp;
 

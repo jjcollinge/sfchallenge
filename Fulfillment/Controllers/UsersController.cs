@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Fabric;
 using System.Linq;
 using System.Threading.Tasks;
 using Common;
@@ -27,7 +28,7 @@ namespace Fulfillment.Controllers
                 var users = await this.fulfillment.GetUsersAsync();
                 return this.Json(users);
             }
-            catch (Exception)
+            catch (FabricException)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
@@ -45,7 +46,7 @@ namespace Fulfillment.Controllers
                 }
                 return this.Json(user);
             }
-            catch (Exception)
+            catch (FabricException)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
@@ -63,6 +64,14 @@ namespace Fulfillment.Controllers
             {
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
+            catch (FabricNotPrimaryException)
+            {
+                return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
+            }
+            catch (FabricException)
+            {
+                return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
+            }
         }
 
         [HttpDelete("{id}")]
@@ -77,7 +86,11 @@ namespace Fulfillment.Controllers
                 }
                 return this.Ok();
             }
-            catch (Exception)
+            catch (FabricNotPrimaryException)
+            {
+                return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
+            }
+            catch (FabricException)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
