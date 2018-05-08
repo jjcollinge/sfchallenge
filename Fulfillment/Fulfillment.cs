@@ -24,8 +24,8 @@ namespace Fulfillment
     /// </summary>
     public class Fulfillment : StatefulService
     {
-        public const string TransferQueueName = "transfers";
-        private TransferQueue Transfers;
+        public const string TradeQueueName = "trades";
+        private TradeQueue Trades;
         private readonly UserStoreClient Users;
         private static readonly HttpClient client = new HttpClient();
         private string loggerEndpoint;
@@ -35,7 +35,7 @@ namespace Fulfillment
             : base(context)
         {
             Init();
-            this.Transfers = new TransferQueue(this.StateManager, TransferQueueName);
+            this.Trades = new TradeQueue(this.StateManager, TradeQueueName);
             this.Users = new UserStoreClient();
         }
 
@@ -43,7 +43,7 @@ namespace Fulfillment
             : base(context, reliableStateManagerReplica)
         {
             Init();
-            this.Transfers = new TransferQueue(this.StateManager, TransferQueueName);
+            this.Trades = new TradeQueue(this.StateManager, TradeQueueName);
             this.Users = new UserStoreClient();
         }
 
@@ -64,27 +64,27 @@ namespace Fulfillment
         }
 
         /// <summary>
-        /// Checks whether the provided transfer
+        /// Checks whether the provided trade
         /// meets the validity requirements. If it
-        /// does, adds it the transfer queue.
+        /// does, adds it the trade queue.
         /// </summary>
-        /// <param name="transfer"></param>
+        /// <param name="trade"></param>
         /// <returns></returns>
-        public async Task<string> AddTransferAsync(TransferRequestModel transferRequest)
+        public async Task<string> AddTradeAsync(TradeRequestModel tradeRequest)
         {
-            Validation.ThrowIfNotValidTransferRequest(transferRequest);
-            var transferId = await this.Transfers.EnqueueAsync(transferRequest);
-            return transferId;
+            Validation.ThrowIfNotValidTradeRequest(tradeRequest);
+            var tradeId = await this.Trades.EnqueueAsync(tradeRequest);
+            return tradeId;
         }
 
         /// <summary>
-        /// Gets the count of the number of transfers currently
-        /// in the transfer queue
+        /// Gets the count of the number of trades currently
+        /// in the trade queue
         /// </summary>
         /// <returns></returns>
-        public async Task<long> GetTransfersCountAsync()
+        public async Task<long> GetTradesCountAsync()
         {
-            return await this.Transfers.CountAsync();
+            return await this.Trades.CountAsync();
         }
 
         /// <summary>
@@ -136,8 +136,8 @@ namespace Fulfillment
         private async Task ReOrderAskAsync(Order order)
         {
             var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
-            var addTransferUri = $"{orderBookEndpoint}/api/orders/ask";
-            await client.PostAsync(addTransferUri, content); //TODO: Handle errors
+            var addTradeUri = $"{orderBookEndpoint}/api/orders/ask";
+            await client.PostAsync(addTradeUri, content); //TODO: Handle errors
         }
 
         /// <summary>
@@ -148,60 +148,59 @@ namespace Fulfillment
         private async Task ReOrderBidAsync(Order order)
         {
             var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
-            var addTransferUri = $"{orderBookEndpoint}/api/orders/bid";
-            await client.PostAsync(addTransferUri, content); //TODO: Handle errors
+            var addTradeUri = $"{orderBookEndpoint}/api/orders/bid";
+            await client.PostAsync(addTradeUri, content); //TODO: Handle errors
         }
 
         /// <summary>
-        /// Sends transfer to logger for external
+        /// Sends trade to logger for external
         /// persistence
         /// </summary>
-        /// <param name="transfer"></param>
+        /// <param name="trade"></param>
         /// <returns></returns>
-        private async Task<bool> LogAsync(Transfer transfer)
+        private async Task<bool> LogAsync(Trade trade)
         {
-            var content = new StringContent(JsonConvert.SerializeObject(transfer), Encoding.UTF8, "application/json");
+            var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
             var addLogUri = $"{loggerEndpoint}/api/logger";
             var res = await client.PostAsync(addLogUri, content); //TODO: Handle errors
             return res.IsSuccessStatusCode;
         }
 
         /// <summary>
-        /// Attempts to transfer value and goods between
+        /// Attempts to trade value and goods between
         /// the buyer and seller. We pass our existing
         /// transaction into the update to allow it to
         /// be commited atomically.
         /// </summary>
         /// <param name="tx"></param>
-        /// <param name="transfer"></param>
+        /// <param name="trade"></param>
         /// <param name="seller"></param>
         /// <param name="buyer"></param>
         /// <returns></returns>
-        private async Task<bool> ApplyTransferAsync(ITransaction tx, Transfer transfer, User seller, User buyer)
+        private async Task<bool> ExecuteTradeAsync(ITransaction tx, Trade trade, User seller, User buyer)
         {
-            var buyerTransfers = buyer.TransferIds.ToList();
-            buyerTransfers.Add(transfer.Id);
+            var buyerTrades = buyer.TradeIds.ToList();
+            buyerTrades.Add(trade.Id);
             buyer = new User(buyer.Id,
                             buyer.Username,
-                            buyer.Quantity + transfer.Bid.Quantity,
-                            buyer.Balance - (transfer.Bid.Value * transfer.Bid.Quantity),
-                            buyerTransfers);
+                            buyer.Quantity + trade.Bid.Quantity,
+                            buyer.Balance - (trade.Bid.Value * trade.Bid.Quantity),
+                            buyerTrades);
 
-            var sellerTransfers = seller.TransferIds.ToList();
-            sellerTransfers.Add(transfer.Id);
+            var sellerTrades = seller.TradeIds.ToList();
+            sellerTrades.Add(trade.Id);
             seller = new User(seller.Id,
                                 seller.Username,
-                                seller.Quantity - transfer.Bid.Quantity,
-                                seller.Balance + (transfer.Bid.Value * transfer.Bid.Quantity),
-                                sellerTransfers);
+                                seller.Quantity - trade.Bid.Quantity,
+                                seller.Balance + (trade.Bid.Value * trade.Bid.Quantity),
+                                sellerTrades);
 
             var buyerUpdated = await Users.UpdateUserAsync(buyer);
             var sellerUpdated = await Users.UpdateUserAsync(seller);
-            var logged = await LogAsync(transfer);
+            var logged = await LogAsync(trade);
 
             return (buyerUpdated && sellerUpdated && logged);
         }
-
 
         protected override async Task RunAsync(CancellationToken cancellationToken)
         {
@@ -215,69 +214,69 @@ namespace Fulfillment
 
                 using (var tx = this.StateManager.CreateTransaction())
                 {
-                    Transfer transfer = null;
-                    transfer = await this.Transfers.DequeueAsync(tx);
+                    Trade trade = null;
+                    trade = await this.Trades.DequeueAsync(tx);
 
-                    if (transfer != null)
+                    if (trade != null)
                     {
-                        // Get the buyer and seller associated with the transfer
-                        var seller = await Users.GetUserAsync(transfer.Ask.UserId);
-                        var buyer = await Users.GetUserAsync(transfer.Bid.UserId);
+                        // Get the buyer and seller associated with the trade
+                        var seller = await Users.GetUserAsync(trade.Ask.UserId);
+                        var buyer = await Users.GetUserAsync(trade.Bid.UserId);
 
-                        // If the transfer is invalid, we'll throw an exception
+                        // If the trade is invalid, we'll throw an exception
                         // and remove it from the queue. If there is a transient
                         // failure, we'll abort and put it back on the queue.
                         try
                         {
-                            Validation.ThrowIfNotValidTransfer(transfer, seller, buyer);
+                            Validation.ThrowIfNotValidTrade(trade, seller, buyer);
                         }
                         catch (BadBuyerException ex)
                         {
                             await tx.CommitAsync();
-                            ServiceEventSource.Current.Message($"Dropping bad transfer. Reason: {ex.Message}");
+                            ServiceEventSource.Current.Message($"Dropping bad trade. Reason: {ex.Message}");
 
                             // Buyer was invalid, Seller's ask may
                             // still be valid.
-                            if (transfer != null)
+                            if (trade != null)
                             {
-                                await ReOrderAskAsync(transfer.Ask);
-                                ServiceEventSource.Current.Message($"Reordering ask {transfer.Ask.Id} for new match");
+                                await ReOrderAskAsync(trade.Ask);
+                                ServiceEventSource.Current.Message($"Reordering ask {trade.Ask.Id} for new match");
                             }
                             continue;
                         }
                         catch (BadSellerException ex)
                         {
                             await tx.CommitAsync();
-                            ServiceEventSource.Current.Message($"Dropping bad transfer. Reason: {ex.Message}");
+                            ServiceEventSource.Current.Message($"Dropping bad trade. Reason: {ex.Message}");
 
                             // Seller was invalid, Buyer's bid may
                             // still be valid.
-                            if (transfer != null)
+                            if (trade != null)
                             {
-                                ServiceEventSource.Current.Message($"Reordering bid {transfer.Bid.Id} for new match");
-                                await ReOrderBidAsync(transfer.Bid);
+                                ServiceEventSource.Current.Message($"Reordering bid {trade.Bid.Id} for new match");
+                                await ReOrderBidAsync(trade.Bid);
                             }
                             continue;
                         }
 
-                        var applied = await ApplyTransferAsync(tx, transfer, seller, buyer);
+                        var applied = await ExecuteTradeAsync(tx, trade, seller, buyer);
                         // Applied indicates both buyer and seller have been
-                        // successfully updated and the transfer has been logged.
+                        // successfully updated and the trade has been logged.
                         // We can now commit the transaction to release our lock
                         // on the queue.
                         if (applied)
                         {
                             await tx.CommitAsync();
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"transfer {transfer.Id} completed");
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} completed");
                         }
                         // Atleast one of the buyer or seller failed to update
-                        // or we failed to log the transfer.
+                        // or we failed to log the trade.
                         // We will abort the transaction and assume a transient
                         // failure.
                         else
                         {
                             tx.Abort();
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"transfer {transfer.Id} aborted");
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} aborted");
                         }
                     }
                 }

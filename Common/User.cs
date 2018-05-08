@@ -19,19 +19,19 @@ namespace Common
     [DataContract]
     public sealed class User : IEquatable<User>
     {
-        public User(string id, string username, uint quantity, uint balance, IEnumerable<string> transferIds)
+        public User(string id, string username, uint quantity, uint balance, IEnumerable<string> tradeIds)
         {
             Id = id;
             Username = username;
             Quantity = quantity;
             Balance = balance;
-            TransferIds = (transferIds == null) ? ImmutableList<string>.Empty : transferIds.ToImmutableList();
+            TradeIds = (tradeIds == null) ? ImmutableList<string>.Empty : tradeIds.ToImmutableList();
         }
 
         [OnDeserialized]
         private void OnDeserialize(StreamingContext context)
         {
-            TransferIds = TransferIds.ToImmutableList();
+            TradeIds = (TradeIds == null) ? ImmutableList<string>.Empty : TradeIds.ToImmutableList();
         }
 
         [DataMember]
@@ -47,7 +47,7 @@ namespace Common
         public readonly uint Balance;
 
         [DataMember]
-        public IEnumerable<String> TransferIds { get; private set; }
+        public IEnumerable<String> TradeIds { get; private set; }
 
         public bool Equals(User other)
         {
@@ -56,7 +56,7 @@ namespace Common
                    string.Equals(Username, Username) &&
                    Quantity == other.Quantity &&
                    Balance == other.Balance &&
-                   Equals(TransferIds, other.TransferIds);
+                   Equals(TradeIds, other.TradeIds);
         }
 
         public override bool Equals(object obj)

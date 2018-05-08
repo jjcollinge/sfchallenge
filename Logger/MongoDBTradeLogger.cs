@@ -10,15 +10,15 @@ using System.Threading.Tasks;
 
 namespace Logger
 {
-    public class MongoDBTransferLogger: ITransferLogger
+    public class MongoDBTradeLogger: ITradeLogger
     {
         private IMongoDatabase database;
         private string collectionName;
 
-        private MongoDBTransferLogger()
+        private MongoDBTradeLogger()
         {}
 
-        public static MongoDBTransferLogger Create(string connectionString, string databaseName, string collectionName)
+        public static MongoDBTradeLogger Create(string connectionString, string databaseName, string collectionName)
         {
             MongoClientSettings settings = MongoClientSettings.FromUrl(
               new MongoUrl(connectionString)
@@ -27,13 +27,13 @@ namespace Logger
               new SslSettings() { EnabledSslProtocols = SslProtocols.Tls12 };
             var mongoClient = new MongoClient(settings);
 
-            var db = new MongoDBTransferLogger();
+            var db = new MongoDBTradeLogger();
             db.database = mongoClient.GetDatabase(databaseName);
             db.collectionName = collectionName;
             return db;
         }
 
-        public async Task InsertAsync(Transfer transfer)
+        public async Task InsertAsync(Trade trade)
         {
             if (database.GetCollection<BsonDocument>(this.collectionName) == null)
             {
@@ -43,12 +43,12 @@ namespace Logger
             var collection = database.GetCollection<BsonDocument>(this.collectionName);
             try
             {
-                var doc = transfer.ToBsonDocument();
+                var doc = trade.ToBsonDocument();
                 await collection.InsertOneAsync(doc);
             }
             catch (MongoDB.Driver.MongoWriteException ex)
             {
-                ServiceEventSource.Current.Message($"Error writing transfer '{transfer.Id}' to MongoDB, error: '{ex.Message}'");
+                ServiceEventSource.Current.Message($"Error writing trade '{trade.Id}' to MongoDB, error: '{ex.Message}'");
             }
         }
 

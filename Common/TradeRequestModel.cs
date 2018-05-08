@@ -6,20 +6,20 @@ using System.Threading.Tasks;
 
 namespace Common
 {
-    public class TransferRequestModel
+    public class TradeRequestModel
     {
         public Order Ask { get; set; }
 
         public Order Bid { get; set; }
 
-        public static implicit operator Transfer(TransferRequestModel request)
+        public static implicit operator Trade(TradeRequestModel request)
         {
             if (request == null)
             {
                 return null;
             }
             var id = request.Ask.Id + "_" + request.Bid.Id;
-            return new Transfer(id, request.Ask, request.Bid);
+            return new Trade(id, request.Ask, request.Bid);
         }
     }
 }

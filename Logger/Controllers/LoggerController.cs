@@ -21,11 +21,11 @@ namespace Logger.Controllers
 
         // POST api/logger
         [HttpPost]
-        public async Task<IActionResult> Post([FromBody]Transfer transfer)
+        public async Task<IActionResult> Post([FromBody]Trade trade)
         {
             try
             {
-                await this.logger.LogAsync(transfer);
+                await this.logger.LogAsync(trade);
                 return this.Ok();
             }
             catch (FabricNotPrimaryException)
