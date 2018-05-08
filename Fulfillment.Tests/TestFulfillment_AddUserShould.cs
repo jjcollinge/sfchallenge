@@ -24,7 +24,7 @@ namespace Fulfillment.Tests
                 Username = username,
             };
 
-            await Assert.ThrowsAsync<InvalidTransferRequestException>(() => service.AddUserAsync(request));
+            await Assert.ThrowsAsync<InvalidTradeRequestException>(() => service.AddUserAsync(request));
         }
     }
 }

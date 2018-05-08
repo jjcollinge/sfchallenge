@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace Logger
 {
-    public interface ITransferLogger
+    public interface ITradeLogger
     {
-        Task InsertAsync(Transfer transfer);
+        Task InsertAsync(Trade trade);
         Task ClearAsync();
     }
 }
