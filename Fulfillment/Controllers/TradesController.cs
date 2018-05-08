@@ -10,25 +10,25 @@ namespace Fulfillment.Controllers
 {
     [Produces("application/json")]
     [Route("api/[controller]")]
-    public class TransfersController : Controller
+    public class TradesController : Controller
     {
         private Fulfillment fulfillment;
 
-        public TransfersController(Fulfillment fulfillment)
+        public TradesController(Fulfillment fulfillment)
         {
             this.fulfillment = fulfillment;
         }
 
-        // POST api/transfers
+        // POST api/trades
         [HttpPost]
-        public async Task<IActionResult> PostAsync([FromBody] TransferRequestModel transferRequest)
+        public async Task<IActionResult> PostAsync([FromBody] TradeRequestModel tradeRequest)
         {
             try
             {
-                var transferId = await this.fulfillment.AddTransferAsync(transferRequest);
-                return this.Ok(transferId);
+                var tradeId = await this.fulfillment.AddTradeAsync(tradeRequest);
+                return this.Ok(tradeId);
             }
-            catch (InvalidTransferRequestException ex)
+            catch (InvalidTradeRequestException ex)
             {
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
             }
@@ -47,7 +47,7 @@ namespace Fulfillment.Controllers
         {
             try
             {
-                var count = await this.fulfillment.GetTransfersCountAsync();
+                var count = await this.fulfillment.GetTradesCountAsync();
                 return this.Ok(count);
             }
             catch (FabricException)

@@ -28,7 +28,7 @@ namespace UserStore.Tests
             }
 
             Assert.Equal(user.Username, userDeserialized.Username);
-            Assert.Equal(user.TransferIds.Count(), userDeserialized.TransferIds.Count());
+            Assert.Equal(user.TradeIds.Count(), userDeserialized.TradeIds.Count());
         }
 
         [Fact]

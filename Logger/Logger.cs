@@ -25,8 +25,8 @@ namespace Logger
     {
         public const string QueueName = "toExport";
         private const string databaseName = "exchange";
-        private const string collectionName = "transfers";
-        private ITransferLogger transferLogger;
+        private const string collectionName = "trades";
+        private ITradeLogger tradeLogger;
 
         public Logger(StatefulServiceContext context)
             : base(context)
@@ -44,31 +44,31 @@ namespace Logger
         {
             ConfigurationPackage configPackage = this.Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
             String connectionString = configPackage.Settings.Sections["CosmosDB"].Parameters["ConnectionString"].Value;
-            transferLogger = MongoDBTransferLogger.Create(connectionString, databaseName, collectionName);
+            tradeLogger = MongoDBTradeLogger.Create(connectionString, databaseName, collectionName);
         }
 
-        public async Task LogAsync(Transfer transfer)
+        public async Task LogAsync(Trade trade)
         {
-            IReliableConcurrentQueue<Transfer> exportQueue =
-             await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Transfer>>(QueueName);
+            IReliableConcurrentQueue<Trade> exportQueue =
+             await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
 
             using (var tx = this.StateManager.CreateTransaction())
             {
-                // Add transfer to log queue
-                await exportQueue.EnqueueAsync(tx, transfer);
+                // Add trade to log queue
+                await exportQueue.EnqueueAsync(tx, trade);
                 await tx.CommitAsync();
             }
         }
 
         public async Task ClearAsync()
         {
-            IReliableConcurrentQueue<Transfer> exportQueue =
-             await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Transfer>>(QueueName);
+            IReliableConcurrentQueue<Trade> exportQueue =
+             await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
 
             using (var tx = this.StateManager.CreateTransaction())
             {
-                // Clear the external log transfer store
-                await transferLogger.ClearAsync();
+                // Clear the external log trade store
+                await tradeLogger.ClearAsync();
 
                 // Clear the queue
                 var t = Task.Run(async () => {
@@ -88,11 +88,11 @@ namespace Logger
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            IReliableConcurrentQueue<Transfer> exportQueue =
-             await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Transfer>>(QueueName);
+            IReliableConcurrentQueue<Trade> exportQueue =
+             await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
 
-            // Take each transfer from the queue and
-            // insert it into an external transfer
+            // Take each trade from the queue and
+            // insert it into an external trade
             // log store.
             while (true)
             {
@@ -102,8 +102,8 @@ namespace Logger
                     var result = await exportQueue.TryDequeueAsync(tx);
                     if (result.HasValue)
                     {
-                        var transfer = result.Value;
-                        await transferLogger.InsertAsync(transfer);
+                        var trade = result.Value;
+                        await tradeLogger.InsertAsync(trade);
 
                         await tx.CommitAsync();
                     }

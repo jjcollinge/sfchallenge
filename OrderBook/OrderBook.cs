@@ -214,7 +214,7 @@ namespace OrderBook
         /// to begin processing.
         /// We use it select the maximum bid and minimum ask. We then
         /// pair these in a match and hand them over to the fulfilment
-        /// service to process the transfer of goods.
+        /// service to process the trade of goods.
         /// </summary>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
@@ -245,7 +245,7 @@ namespace OrderBook
                     ServiceEventSource.Current.ServiceMessage(this.Context, $"New match: order {maxBid.Id} and order {minAsk.Id}");
                     Order match = null;
 
-                    // In this exchange, the transfer is fulfilled at
+                    // In this exchange, the trade is fulfilled at
                     // the value the buyer is willing to pay. Therefore,
                     // the seller may get more value than they were 
                     // willing to accept.
@@ -280,34 +280,34 @@ namespace OrderBook
                         continue;
                     }
 
-                    // Build a transfer containing the matched
+                    // Build a trade containing the matched
                     // ask and bid.
-                    var transfer = new TransferRequestModel
+                    var trade = new TradeRequestModel
                     {
                         Ask = match,
                         Bid = maxBid,
                     };
 
-                    // Send the transfer to our fulfillment
+                    // Send the trade to our fulfillment
                     // service for fulfillment.
-                    var content = new StringContent(JsonConvert.SerializeObject(transfer), Encoding.UTF8, "application/json");
+                    var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
                     HttpResponseMessage res = null;
                     try
                     {
-                        res = await client.PostAsync($"{fulfillmentEndpoint}/api/transfers", content);
+                        res = await client.PostAsync($"{fulfillmentEndpoint}/api/trades", content);
                     }
                     catch (HttpRequestException ex)
                     {
                         // Exception thrown when attempting to make HTTP POST
                         // to fulfillment API. Possibly a DNS, network connectivity
                         // or timeout issue.
-                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Error sending transfer to fulfillment service, error: '{ex.Message}'");
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Error sending trade to fulfillment service, error: '{ex.Message}'");
 
                         // Log the error and retry after a given delay
                         attempts++;
                         if (attempts >= maxAttempts)
                         {
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Attempts to send transfer to fulfillment service limit {maxAttempts} exceeded, terminating with error.");
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Attempts to send trade to fulfillment service limit {maxAttempts} exceeded, terminating with error.");
                             throw new Exception("OrderBook cannot contact Fulfillment service.");
                         }
                         await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
@@ -319,7 +319,7 @@ namespace OrderBook
                         throw ex;
                     }
                     // If the response is successful, assume
-                    // transfer is safe to remove.
+                    // trade is safe to remove.
                     if (res.IsSuccessStatusCode)
                     {
                         using (var tx = this.StateManager.CreateTransaction())
@@ -333,8 +333,8 @@ namespace OrderBook
                                 ServiceEventSource.Current.ServiceMessage(this.Context, $"Removed Ask {minAsk.Id} and Bid {maxBid.Id}");
                                 await tx.CommitAsync();
 
-                                var transferId = await res.Content.ReadAsStringAsync();
-                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Created new transfer with id '{transferId}'");
+                                var tradeId = await res.Content.ReadAsStringAsync();
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Created new trade with id '{tradeId}'");
                             }
                             else
                             {
@@ -355,8 +355,8 @@ namespace OrderBook
 
                         if (attempts >= maxAttempts)
                         {
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Attempts to send transfer to fulfillment service limit {maxAttempts} exceeded, terminating with error.");
-                            throw new Exception("OrderBook failed to send transfer to fulfillment service.");
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Attempts to send trade to fulfillment service limit {maxAttempts} exceeded, terminating with error.");
+                            throw new Exception("OrderBook failed to send trade to fulfillment service.");
                         }
                         await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
                         continue;

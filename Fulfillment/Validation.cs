@@ -12,27 +12,27 @@ namespace Fulfillment
         {
             if (string.IsNullOrWhiteSpace(user.Username))
             {
-                throw new InvalidTransferRequestException("Username cannot be null, empty or contain whitespace");
+                throw new InvalidTradeRequestException("Username cannot be null, empty or contain whitespace");
             }
         }
 
-        public static void ThrowIfNotValidTransferRequest(Transfer transfer)
+        public static void ThrowIfNotValidTradeRequest(Trade trade)
         {
-            if (transfer.Ask == null || transfer.Bid == null)
+            if (trade.Ask == null || trade.Bid == null)
             {
-                throw new InvalidTransferRequestException("Bid or ask cannot be null");
+                throw new InvalidTradeRequestException("Bid or ask cannot be null");
             }
-            if (transfer.Ask.Value > transfer.Bid.Value)
+            if (trade.Ask.Value > trade.Bid.Value)
             {
-                throw new InvalidTransferRequestException("The ask value cannot be higher than the bid value");
+                throw new InvalidTradeRequestException("The ask value cannot be higher than the bid value");
             }
-            if (transfer.Ask.Quantity < transfer.Bid.Quantity)
+            if (trade.Ask.Quantity < trade.Bid.Quantity)
             {
-                throw new InvalidTransferRequestException("The ask quantity cannot be lower than the bid quantity");
+                throw new InvalidTradeRequestException("The ask quantity cannot be lower than the bid quantity");
             }
         }
 
-        public static void ThrowIfNotValidTransfer(Transfer transfer, User seller, User buyer)
+        public static void ThrowIfNotValidTrade(Trade trade, User seller, User buyer)
         {
             if (seller == null)
             {
@@ -42,19 +42,19 @@ namespace Fulfillment
             {
                 throw new BadBuyerException($"Matched seller doesn't exist");
             }
-            if (seller.Quantity < transfer.Bid.Quantity)
+            if (seller.Quantity < trade.Bid.Quantity)
             {
-                throw new BadSellerException($"Matched seller '{seller.Id}' doesn't have suffient quantity to satisfy the transfer");
+                throw new BadSellerException($"Matched seller '{seller.Id}' doesn't have suffient quantity to satisfy the trade");
             }
-            if (buyer.Balance < transfer.Bid.Value)
+            if (buyer.Balance < trade.Bid.Value)
             {
-                throw new BadBuyerException($"Matched buyer '{buyer.Id}' doesn't have suffient balance to satisfy the transfer");
+                throw new BadBuyerException($"Matched buyer '{buyer.Id}' doesn't have suffient balance to satisfy the trade");
             }
-            if (buyer.TransferIds.Any(t => t.Split("_").LastOrDefault() == transfer.Bid.Id))
+            if (buyer.TradeIds.Any(t => t.Split("_").LastOrDefault() == trade.Bid.Id))
             {
                 throw new BadBuyerException("$The bid order has already been processed");
             }
-            if (seller.TransferIds.Any(t => t.Split("_").FirstOrDefault() == transfer.Ask.Id))
+            if (seller.TradeIds.Any(t => t.Split("_").FirstOrDefault() == trade.Ask.Id))
             {
                 throw new BadSellerException("$The ask order has already been processed");
             }

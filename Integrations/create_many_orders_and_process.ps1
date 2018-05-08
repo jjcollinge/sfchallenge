@@ -7,7 +7,7 @@ $fulfillmentSvcEndpoint = "http://${domain}:9080"
 $bidEndpoint = "${ordersSvcEndpoint}/api/orders/bid"
 $askEndpoint = "${ordersSvcEndpoint}/api/orders/ask"
 $ordersEndpoint = "${ordersSvcEndpoint}/api/orders"
-$transfersEndpoint = "${fulfillmentSvcEndpoint}/api/transfers"
+$transfersEndpoint = "${fulfillmentSvcEndpoint}/api/trades"
 $usersEndpoint = "${fulfillmentSvcEndpoint}/api/users"
 
 function log
