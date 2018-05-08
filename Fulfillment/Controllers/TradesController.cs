@@ -24,6 +24,11 @@ namespace Fulfillment.Controllers
         [HttpPost]
         public async Task<IActionResult> PostAsync([FromBody] TradeRequestModel tradeRequest)
         {
+            if (IsCoolingDown)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(3));
+                return new StatusCodeResult(429);
+            }
             try
             {
                 var tradeId = await this.fulfillment.AddTradeAsync(tradeRequest);
