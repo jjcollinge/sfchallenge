@@ -33,6 +33,9 @@ namespace Fulfillment.Tests
             ConfigurationProperty loggerPort = CreateConfigurationSectionParameters("Logger_Port", "9000");
             configSection.Parameters.Add(loggerPort);
 
+            ConfigurationProperty maxTradesPending = CreateConfigurationSectionParameters("MaxTradesPending", "10");
+            configSection.Parameters.Add(maxTradesPending);
+
             //Build ConfigurationPackage
             ConfigurationPackage configPackage = CreateConfigurationPackage(configSettings);
             var context = new MockCodePackageActivationContext(

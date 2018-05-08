@@ -20,6 +20,11 @@
     <Parameter Name="Fulfillment_TargetReplicaSetSize" DefaultValue="3" />
     <Parameter Name="Fulfillment_DnsName" DefaultValue="fulfillment.exchange" />
     <Parameter Name="Fulfillment_Port" DefaultValue="9080" />
+    <!--
+    You have an SLA with management to block new trades when 800 existing trades are pending
+    Changing this value with fail a system audit. Other approaches much be used to scale 
+    -->
+    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="800"/>
     <!-- OrderBook parameters -->
     <Parameter Name="OrderBook_DnsName" DefaultValue="orderbook.exchange" />
     <Parameter Name="OrderBook_Port" DefaultValue="9081" />
@@ -69,7 +74,7 @@
             <Parameter Name="OrderBook_Port" Value="[OrderBook_Port]" />
             <Parameter Name="Logger_DnsName" Value="[Logger_DnsName]" />
             <Parameter Name="Logger_Port" Value="[Logger_Port]" />
-            <Parameter Name="Fulfillment_MaxTransfersPending" Value="[Fulfillment_MaxTransfersPending]" />
+            <Parameter Name="MaxTradesPending" Value="[Fulfillment_MaxTradesPending]" />
           </Section>
         </Settings>
       </ConfigOverride>

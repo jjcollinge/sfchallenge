@@ -13,6 +13,7 @@ namespace Fulfillment.Controllers
     public class TradesController : Controller
     {
         private Fulfillment fulfillment;
+        private static bool IsCoolingDown = false;
 
         public TradesController(Fulfillment fulfillment)
         {
@@ -36,11 +37,19 @@ namespace Fulfillment.Controllers
             {
                 return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
             }
+            catch (MaxPendingTradesExceededException)
+            {
+                IsCoolingDown = true;
+                await Task.Delay(TimeSpan.FromSeconds(15));
+                IsCoolingDown = false;
+                return new StatusCodeResult(429);
+            }
             catch (FabricException)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
         }
+
 
         [HttpGet]
         public async Task<IActionResult> GetAsync()

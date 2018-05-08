@@ -29,9 +29,8 @@ namespace Fulfillment
         private readonly UserStoreClient Users;
         private static readonly HttpClient client = new HttpClient();
         private string loggerEndpoint;
+        private int maxPendingTrades;
         private string orderBookEndpoint;
-
-        public ConfigurationPackage configPackage { get; private set; }
 
         public Fulfillment(StatefulServiceContext context)
             : base(context)
@@ -61,7 +60,7 @@ namespace Fulfillment
             configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
             dnsName = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["OrderBook_DnsName"].Value;
             port = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["OrderBook_Port"].Value;
-
+            maxPendingTrades = int.Parse(configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["MaxTradesPending"].Value);
             orderBookEndpoint = $"http://{dnsName}:{port}";
         }
 
@@ -76,11 +75,10 @@ namespace Fulfillment
         {
             Validation.ThrowIfNotValidTradeRequest(tradeRequest);
             var pendingTrades = await Trades.CountAsync();
-            var maxPendingTrades = int.Parse(configPackage.Settings.Sections["FulfillmentConfig"].Parameters["Fulfillment_MaxTransfersPending"].Value);
             if (pendingTrades > maxPendingTrades)
             {
                 ServiceEventSource.Current.ServiceMaxPendingLimitHit();
-                throw new MaxPendingTransfersExceededException(pendingTrades);
+                throw new MaxPendingTradesExceededException(pendingTrades);
             }
             var tradeId = await this.Trades.EnqueueAsync(tradeRequest);
             return tradeId;
