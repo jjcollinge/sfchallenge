@@ -94,12 +94,12 @@ namespace Logger
             // Take each trade from the queue and
             // insert it into an external trade
             // log store.
-            while (true)
+            while (true && !cancellationToken.IsCancellationRequested)
             {
                 using (var tx = this.StateManager.CreateTransaction())
                 {
                     // This can be batched...
-                    var result = await exportQueue.TryDequeueAsync(tx);
+                    var result = await exportQueue.TryDequeueAsync(tx, cancellationToken);
                     if (result.HasValue)
                     {
                         var trade = result.Value;

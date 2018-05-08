@@ -20,7 +20,7 @@
                                     AzureActiveDirectory="true"
                                     ServerCertThumbprint="0123456789012345678901234567890123456789" />
   -->
-  <ClusterConnectionParameters ConnectionEndpoint="lgsfhack3.westeurope.cloudapp.azure.com:19000" X509Credential="true" ServerCertThumbprint="5E3A387036CA61B046AF9FD69004E29044BFE5C6" FindType="FindByThumbprint" FindValue="5E3A387036CA61B046AF9FD69004E29044BFE5C6" StoreLocation="CurrentUser" StoreName="My" />
+  <ClusterConnectionParameters ConnectionEndpoint="win243dbhqilqz.westus.cloudapp.azure.com:19000" X509Credential="true" ServerCertThumbprint="7A16201C6DF8CEC4992925D6F290FD4D31B9A0D8" FindType="FindByThumbprint" FindValue="7A16201C6DF8CEC4992925D6F290FD4D31B9A0D8" StoreLocation="CurrentUser" StoreName="My" />
   <ApplicationParameterFile Path="..\ApplicationParameters\Cloud.xml" />
   <CopyPackageParameters CompressPackage="true" />
 </PublishProfile>
