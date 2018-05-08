@@ -40,7 +40,7 @@ namespace OrderBook
 
         // HTTP details for communicating with Fulfillment service
         private static readonly HttpClient client = new HttpClient();
-        private string fulfillmentEndpoint;
+        private string reverseProxyPort;
 
         private int maxPendingAsks;
         private int maxPendingBids;
@@ -67,10 +67,7 @@ namespace OrderBook
         {
             // Get configuration from our PackageRoot/Config/Setting.xml file
             var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
-            var dnsName = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Fulfillment_DnsName"].Value;
-            var port = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Fulfillment_Port"].Value;
-
-            fulfillmentEndpoint = $"http://{dnsName}:{port}";
+            reverseProxyPort = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["ReverseProxy_Port"].Value;
 
             maxPendingAsks = int.Parse(configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
             maxPendingBids = int.Parse(configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
@@ -294,7 +291,7 @@ namespace OrderBook
                     HttpResponseMessage res = null;
                     try
                     {
-                        res = await client.PostAsync($"{fulfillmentEndpoint}/api/transfers", content);
+                        res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Fulfillment/api/transfers", content);
                     }
                     catch (HttpRequestException ex)
                     {

@@ -19,5 +19,6 @@
     <Parameter Name="Logger_DnsName" Value="localhost" />
     <Parameter Name="Fulfillment_DnsName" Value="localhost" />
     <Parameter Name="OrderBook_DnsName" Value="localhost" />
+    <Parameter Name="ReverseProxy_Port" Value="19081" />
   </Parameters>
 </Application>

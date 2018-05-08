@@ -14,5 +14,6 @@
     <Parameter Name="OrderBook_MinReplicaSetSize" Value="3" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" Value="3" />
     <Parameter Name="CosmosDBConnectionString" Value="" />
+    <Parameter Name="ReverseProxy_Port" Value="19081" />
   </Parameters>
 </Application>
