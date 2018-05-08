@@ -234,6 +234,13 @@ namespace OrderBook
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
+                // If the book can't make any matches then sleep for 300ms
+                // this prevents high idle CPU utilisation when there are no orders to process
+                if (await bids.CountAsync() < 1 || await asks.CountAsync() < 1)
+                {
+                    await Task.Delay(500);
+                }
+
                 // Get the maximum bid and minimum ask
                 var maxBid = this.bids.GetMaxOrder();
                 var minAsk = this.asks.GetMinOrder();
