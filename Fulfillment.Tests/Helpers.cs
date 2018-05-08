@@ -18,20 +18,11 @@ namespace Fulfillment.Tests
             //Build ConfigurationSettings
             var configSettings = CreateConfigurationSettings(configSections);
 
-            ConfigurationSection configSection = CreateConfigurationSection("FulfillmentConfig");
+            ConfigurationSection configSection = CreateConfigurationSection("ClusterConfig");
             configSections.Add(configSection);
 
-            ConfigurationProperty orderBookDnsName = CreateConfigurationSectionParameters("OrderBook_DnsName", "localhost");
-            configSection.Parameters.Add(orderBookDnsName);
-
-            ConfigurationProperty orderBookPort = CreateConfigurationSectionParameters("OrderBook_Port", "8080");
-            configSection.Parameters.Add(orderBookPort);
-
-            ConfigurationProperty loggerDnsName = CreateConfigurationSectionParameters("Logger_DnsName", "localhost");
-            configSection.Parameters.Add(loggerDnsName);
-
-            ConfigurationProperty loggerPort = CreateConfigurationSectionParameters("Logger_Port", "9000");
-            configSection.Parameters.Add(loggerPort);
+            ConfigurationProperty reverseProxyPort = CreateConfigurationSectionParameters("ReverseProxy_Port", "19081");
+            configSection.Parameters.Add(reverseProxyPort);
 
             //Build ConfigurationPackage
             ConfigurationPackage configPackage = CreateConfigurationPackage(configSettings);

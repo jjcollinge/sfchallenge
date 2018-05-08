@@ -6,10 +6,9 @@
     <!-- Logger parameters -->
     <Parameter Name="Logger_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="Logger_PartitionCount" DefaultValue="1" />
-    <Parameter Name="Logger_DnsName" DefaultValue="logger.exchange" />
-    <Parameter Name="Logger_Port" DefaultValue="9082" />
     <Parameter Name="Logger_TargetReplicaSetSize" DefaultValue="3" />
     <Parameter Name="CosmosDBConnectionString" DefaultValue="" />
+    <Parameter Name="Logger_Port" DefaultValue="9082" />
     <!-- UserStore parameters -->
     <Parameter Name="UserStore_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="UserStore_PartitionCount" DefaultValue="1" />
@@ -18,14 +17,12 @@
     <Parameter Name="Fulfillment_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="Fulfillment_PartitionCount" DefaultValue="1" />
     <Parameter Name="Fulfillment_TargetReplicaSetSize" DefaultValue="3" />
-    <Parameter Name="Fulfillment_DnsName" DefaultValue="fulfillment.exchange" />
     <Parameter Name="Fulfillment_Port" DefaultValue="9080" />
     <!-- OrderBook parameters -->
-    <Parameter Name="OrderBook_DnsName" DefaultValue="orderbook.exchange" />
-    <Parameter Name="OrderBook_Port" DefaultValue="9081" />
     <Parameter Name="OrderBook_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="OrderBook_PartitionCount" DefaultValue="1" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" DefaultValue="3" />
+    <Parameter Name="OrderBook_Port" DefaultValue="9081" />
     <!--
     You have an SLA with management to block new orders when 200 existing orders are pending
     Changing this value with fail a system audit. Other approaches much be used to scale 
@@ -60,11 +57,8 @@
     <ConfigOverrides>
       <ConfigOverride Name="Config">
         <Settings>
-          <Section Name="FulfillmentConfig">
-            <Parameter Name="OrderBook_DnsName" Value="[OrderBook_DnsName]" />
-            <Parameter Name="OrderBook_Port" Value="[OrderBook_Port]" />
-            <Parameter Name="Logger_DnsName" Value="[Logger_DnsName]" />
-            <Parameter Name="Logger_Port" Value="[Logger_Port]" />
+          <Section Name="ClusterConfig">
+            <Parameter Name="ReverseProxy_Port" Value="[ReverseProxy_Port]" />
           </Section>
         </Settings>
       </ConfigOverride>

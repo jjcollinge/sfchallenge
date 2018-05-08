@@ -28,8 +28,7 @@ namespace Fulfillment
         private TradeQueue Trades;
         private readonly UserStoreClient Users;
         private static readonly HttpClient client = new HttpClient();
-        private string loggerEndpoint;
-        private string orderBookEndpoint;
+        private string reverseProxyPort;
 
         public Fulfillment(StatefulServiceContext context)
             : base(context)
@@ -51,16 +50,7 @@ namespace Fulfillment
         {
             // Get configuration from our PackageRoot/Config/Setting.xml file
             var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
-            var dnsName = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["Logger_DnsName"].Value;
-            var port = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["Logger_Port"].Value;
-
-            loggerEndpoint = $"http://{dnsName}:{port}";
-
-            configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
-            dnsName = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["OrderBook_DnsName"].Value;
-            port = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["OrderBook_Port"].Value;
-
-            orderBookEndpoint = $"http://{dnsName}:{port}";
+            reverseProxyPort = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["ReverseProxy_Port"].Value;
         }
 
         /// <summary>
@@ -136,8 +126,7 @@ namespace Fulfillment
         private async Task ReOrderAskAsync(Order order)
         {
             var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
-            var addTradeUri = $"{orderBookEndpoint}/api/orders/ask";
-            await client.PostAsync(addTradeUri, content); //TODO: Handle errors
+            await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/OrderBook/api/orders/ask", content); //TODO: Handle errors
         }
 
         /// <summary>
@@ -148,8 +137,7 @@ namespace Fulfillment
         private async Task ReOrderBidAsync(Order order)
         {
             var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
-            var addTradeUri = $"{orderBookEndpoint}/api/orders/bid";
-            await client.PostAsync(addTradeUri, content); //TODO: Handle errors
+            await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/OrderBook/api/orders/bid", content); //TODO: Handle errors
         }
 
         /// <summary>
@@ -161,8 +149,7 @@ namespace Fulfillment
         private async Task<bool> LogAsync(Trade trade)
         {
             var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
-            var addLogUri = $"{loggerEndpoint}/api/logger";
-            var res = await client.PostAsync(addLogUri, content); //TODO: Handle errors
+            var res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Logger/api/logger", content); //TODO: Handle errors
             return res.IsSuccessStatusCode;
         }
 
