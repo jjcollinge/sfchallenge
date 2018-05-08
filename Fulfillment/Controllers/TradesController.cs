@@ -13,6 +13,7 @@ namespace Fulfillment.Controllers
     public class TradesController : Controller
     {
         private Fulfillment fulfillment;
+        // Not thread safe as worst case is cooldown lasting slightly longer than required
         private static bool IsCoolingDown = false;
 
         public TradesController(Fulfillment fulfillment)
@@ -44,9 +45,12 @@ namespace Fulfillment.Controllers
             }
             catch (MaxPendingTradesExceededException)
             {
-                IsCoolingDown = true;
-                await Task.Delay(TimeSpan.FromSeconds(15));
-                IsCoolingDown = false;
+                if (!IsCoolingDown)
+                {
+                    IsCoolingDown = true;
+                    await Task.Delay(TimeSpan.FromSeconds(15));
+                    IsCoolingDown = false;
+                }
                 return new StatusCodeResult(429);
             }
             catch (FabricException)
