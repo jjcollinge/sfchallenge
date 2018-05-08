@@ -30,6 +30,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Fulfillment\Fulfillment.csproj" />
+    <ProjectReference Include="..\Gateway\Gateway.csproj" />
     <ProjectReference Include="..\OrderBook\OrderBook.csproj" />
     <ProjectReference Include="..\UserStore\UserStore.csproj" />
   </ItemGroup>

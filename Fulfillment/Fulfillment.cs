@@ -133,6 +133,11 @@ namespace Fulfillment
                 // runtime can kill us properly.
                 cancellationToken.ThrowIfCancellationRequested();
 
+#if DEBUG
+                //Stop CPU being pinned when developing locally
+                await Task.Delay(1000);
+#endif
+
                 using (var tx = this.StateManager.CreateTransaction())
                 {
                     Transfer transfer = null;

@@ -2,7 +2,7 @@
     [string]$domain="localhost"
 )
 
-$ordersSvcEndpoint = "http://${domain}:9081"
+$ordersSvcEndpoint = "http://${domain}:19081/Exchange/Gateway"
 $fulfillmentSvcEndpoint = "http://${domain}:9080"
 $bidEndpoint = "${ordersSvcEndpoint}/api/orders/bid"
 $askEndpoint = "${ordersSvcEndpoint}/api/orders/ask"
