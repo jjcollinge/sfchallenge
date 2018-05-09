@@ -28,10 +28,7 @@ namespace Fulfillment
         private TradeQueue Trades;
         private readonly UserStoreClient Users;
         private static readonly HttpClient client = new HttpClient();
-        private string loggerEndpoint;
-        private int maxPendingTrades;
-        private string orderBookEndpoint;
-        private AutoResetEvent tradeReceivedEvent = new AutoResetEvent(true);
+        private string reverseProxyPort;
 
         public Fulfillment(StatefulServiceContext context)
             : base(context)
@@ -53,16 +50,7 @@ namespace Fulfillment
         {
             // Get configuration from our PackageRoot/Config/Setting.xml file
             var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
-            var dnsName = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["Logger_DnsName"].Value;
-            var port = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["Logger_Port"].Value;
-
-            loggerEndpoint = $"http://{dnsName}:{port}";
-
-            configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
-            dnsName = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["OrderBook_DnsName"].Value;
-            port = configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["OrderBook_Port"].Value;
-            maxPendingTrades = int.Parse(configurationPackage.Settings.Sections["FulfillmentConfig"].Parameters["MaxTradesPending"].Value);
-            orderBookEndpoint = $"http://{dnsName}:{port}";
+            reverseProxyPort = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["ReverseProxy_Port"].Value;
         }
 
         /// <summary>
@@ -148,8 +136,7 @@ namespace Fulfillment
             {
 
                 var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
-                var addTradeUri = $"{orderBookEndpoint}/api/orders/ask";
-                await client.PostAsync(addTradeUri, content); //TODO: Handle errors
+                await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/OrderBook/api/orders/ask", content);
             }
             catch (Exception ex)
             {
@@ -167,13 +154,14 @@ namespace Fulfillment
             try
             {
                 var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
-                var addTradeUri = $"{orderBookEndpoint}/api/orders/bid";
-                await client.PostAsync(addTradeUri, content); //TODO: Handle errors
+                await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/OrderBook/api/orders/bid", content); //TODO: Handle errors
             }
             catch (Exception ex)
             {
                 ServiceEventSource.Current.ServiceMessage(Context, ex.ToString());
             }
+
+        }
 
         }
 
@@ -186,8 +174,7 @@ namespace Fulfillment
         private async Task<bool> LogAsync(Trade trade)
         {
             var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
-            var addLogUri = $"{loggerEndpoint}/api/logger";
-            var res = await client.PostAsync(addLogUri, content); //TODO: Handle errors
+            var res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Logger/api/logger", content); //TODO: Handle errors
             return res.IsSuccessStatusCode;
         }
 
@@ -229,10 +216,10 @@ namespace Fulfillment
 
         protected override async Task RunAsync(CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
             while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 // Throttle loop:
                 // This limit cannot be removed or you will fail an audit.
                 if (await Trades.CountAsync() < 1)
@@ -243,7 +230,7 @@ namespace Fulfillment
                 using (var tx = this.StateManager.CreateTransaction())
                 {
                     Trade trade = null;
-                    trade = await this.Trades.DequeueAsync(tx);
+                    trade = await this.Trades.DequeueAsync(tx, cancellationToken);
 
                     if (trade != null)
                     {

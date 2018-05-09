@@ -11,15 +11,12 @@
     <Parameter Name="Fulfillment_PartitionCount" Value="1" />
     <Parameter Name="Fulfillment_MinReplicaSetSize" Value="3" />
     <Parameter Name="Fulfillment_TargetReplicaSetSize" Value="3" />
-    <Parameter Name="Fulfillment_DnsName" Value="localhost" />
-    <Parameter Name="OrderBook_DnsName" Value="localhost" />
     <Parameter Name="OrderBook_PartitionCount" Value="1" />
     <Parameter Name="OrderBook_MinReplicaSetSize" Value="3" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" Value="3" />
-    <Parameter Name="Logger_DnsName" Value="localhost" />
-    <Parameter Name="Fulfillment_DnsName" Value="localhost" />
-    <Parameter Name="OrderBook_DnsName" Value="localhost" />
+
     <Parameter Name="MongoEnableSSL" Value="false" />
     <Parameter Name="MongoConnectionString" Value="mongodb://localhost:27017" />
+    <Parameter Name="ReverseProxy_Port" Value="19081" />
   </Parameters>
 </Application>

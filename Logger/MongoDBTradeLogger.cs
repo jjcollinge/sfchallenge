@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Authentication;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Logger
@@ -36,7 +37,7 @@ namespace Logger
             return db;
         }
 
-        public async Task InsertAsync(Trade trade)
+        public async Task InsertAsync(Trade trade, CancellationToken cancellationToken)
         {
             if (database.GetCollection<BsonDocument>(this.collectionName) == null)
             {
@@ -47,7 +48,7 @@ namespace Logger
             try
             {
                 var doc = trade.ToBsonDocument();
-                await collection.InsertOneAsync(doc);
+                await collection.InsertOneAsync(doc, null, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -55,11 +56,11 @@ namespace Logger
             }
         }
 
-        public async Task ClearAsync()
+        public async Task ClearAsync(CancellationToken cancellationToken)
         {
             if (database.GetCollection<BsonDocument>(this.collectionName) != null)
             {
-                await database.DropCollectionAsync(this.collectionName);
+                await database.DropCollectionAsync(this.collectionName, cancellationToken);
             }
         }
     }

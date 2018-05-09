@@ -18,29 +18,26 @@ namespace OrderBook.Tests
             //Build ConfigurationSettings
             var configSettings = CreateConfigurationSettings(configSections);
 
-            //add ConfigurationSection
-            ConfigurationSection configSection = CreateConfigurationSection("OrderBookConfig");
-            configSections.Add(configSection);
+            ConfigurationSection orderBookConfig = CreateConfigurationSection("OrderBookConfig");
+            configSections.Add(orderBookConfig);
 
-            //add Parameters entry
             ConfigurationProperty maxAsksParam = CreateConfigurationSectionParameters("MaxAsksPending", "200");
-            configSection.Parameters.Add(maxAsksParam);
+            orderBookConfig.Parameters.Add(maxAsksParam);
 
             ConfigurationProperty maxBidsPending = CreateConfigurationSectionParameters("MaxBidsPending", "200");
-            configSection.Parameters.Add(maxBidsPending);
+            orderBookConfig.Parameters.Add(maxBidsPending);
 
-            ConfigurationProperty orderBookDnsName = CreateConfigurationSectionParameters("Fulfillment_DnsName", "localhost");
-            configSection.Parameters.Add(orderBookDnsName);
+            ConfigurationSection clusterConfig = CreateConfigurationSection("ClusterConfig");
+            configSections.Add(clusterConfig);
 
-            ConfigurationProperty orderBookPort = CreateConfigurationSectionParameters("Fulfillment_Port", "8080");
-            configSection.Parameters.Add(orderBookPort);
+            ConfigurationProperty reverseProxyPort = CreateConfigurationSectionParameters("ReverseProxy_Port", "19081");
+            clusterConfig.Parameters.Add(reverseProxyPort);
 
-            //add  ConfigurationSection
-            ConfigurationSection configSection2 = CreateConfigurationSection("CosmosDB");
-            configSections.Add(configSection2);
+            //ConfigurationSection configSection2 = CreateConfigurationSection("CosmosDB");
+            //configSections.Add(clusterConfig);
 
-            ConfigurationProperty cosmosDBConnectionString = CreateConfigurationSectionParameters("ConnectionString", "");
-            configSection2.Parameters.Add(cosmosDBConnectionString);
+            //ConfigurationProperty cosmosDBConnectionString = CreateConfigurationSectionParameters("ConnectionString", "");
+            //clusterConfig.Parameters.Add(cosmosDBConnectionString);
 
             //Build ConfigurationPackage
             ConfigurationPackage configPackage = CreateConfigurationPackage(configSettings);
