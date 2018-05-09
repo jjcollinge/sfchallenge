@@ -1,11 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Gateway
 {
@@ -13,6 +18,7 @@ namespace Gateway
     {
         private const string ForwarderForHeader = "X-Forwarded-Host";
         private const string ItemTypeHeader = "x-item-type";
+        public static HttpClient Client = new HttpClient();
 
 
         public void ConfigureServices(IServiceCollection services)
@@ -48,16 +54,28 @@ namespace Gateway
                 var exists = context.Request.Headers.TryGetValue(ItemTypeHeader, out var itemType);
                 if (exists)
                 {
-                    var partitionedEndpoint = $"{forwardingUrl}&PartitionKey={itemType.ToString()}&PartitionKind=Named";
-                    context.Response.StatusCode = 307;
-                    context.Response.Headers.Add("Location", partitionedEndpoint);
-                    await context.Response.WriteAsync($"Redirect issused with partitioning enabled. Endpoint: {partitionedEndpoint}");
+                    string bodyContent = new StreamReader(context.Request.Body).ReadToEnd();
+                    string method = context.Request.Method;
+
+                    var partitionedEndpoint = new Uri($"{forwardingUrl}&PartitionKey={itemType.ToString()}&PartitionKind=Named");
+
+                    using (var requestMessage = context.CreateProxyHttpRequest(partitionedEndpoint))
+                    {
+                        using (var responseMessage = await context.SendProxyHttpRequest(requestMessage))
+                        {
+                            await context.CopyProxyHttpResponse(responseMessage);
+                        }
+                    }
                 }
                 else
                 {
-                    context.Response.StatusCode = 307;
-                    context.Response.Headers.Add("Location", forwardingUrl);
-                    await context.Response.WriteAsync($"Redirect issused without partitioning. Endpoint: {forwardingUrl}");
+                    using (var requestMessage = context.CreateProxyHttpRequest(new Uri(forwardingUrl)))
+                    {
+                        using (var responseMessage = await context.SendProxyHttpRequest(requestMessage))
+                        {
+                            await context.CopyProxyHttpResponse(responseMessage);
+                        }
+                    }
                 }
             });
         }
@@ -82,4 +100,81 @@ namespace Gateway
             return endpoint;
         }
     }
+    public static class Extensions
+    {
+
+        public static HttpRequestMessage CreateProxyHttpRequest(this HttpContext context, Uri uri)
+        {
+            var request = context.Request;
+
+            var requestMessage = new HttpRequestMessage();
+            var requestMethod = request.Method;
+            if (!HttpMethods.IsGet(requestMethod) &&
+                !HttpMethods.IsHead(requestMethod) &&
+                !HttpMethods.IsDelete(requestMethod) &&
+                !HttpMethods.IsTrace(requestMethod))
+            {
+                var streamContent = new StreamContent(request.Body);
+                requestMessage.Content = streamContent;
+            }
+
+            // Copy the request headers
+            foreach (var header in request.Headers)
+            {
+                if (!requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()) && requestMessage.Content != null)
+                {
+                    requestMessage.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+                }
+            }
+
+            requestMessage.Headers.Host = uri.Authority;
+            requestMessage.RequestUri = uri;
+            requestMessage.Method = new HttpMethod(request.Method);
+
+            return requestMessage;
+        }
+
+        public static Task<HttpResponseMessage> SendProxyHttpRequest(this HttpContext context, HttpRequestMessage requestMessage)
+        {
+            if (requestMessage == null)
+            {
+                throw new ArgumentNullException(nameof(requestMessage));
+            }
+            
+            return Startup.Client.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+        }
+
+        private const int StreamCopyBufferSize = 81920;
+
+        public static async Task CopyProxyHttpResponse(this HttpContext context, HttpResponseMessage responseMessage)
+        {
+            if (responseMessage == null)
+            {
+                throw new ArgumentNullException(nameof(responseMessage));
+            }
+
+            var response = context.Response;
+
+            response.StatusCode = (int)responseMessage.StatusCode;
+            foreach (var header in responseMessage.Headers)
+            {
+                response.Headers[header.Key] = header.Value.ToArray();
+            }
+
+            foreach (var header in responseMessage.Content.Headers)
+            {
+                response.Headers[header.Key] = header.Value.ToArray();
+            }
+
+            // SendAsync removes chunking from the response. This removes the header so it doesn't expect a chunked response.
+            response.Headers.Remove("transfer-encoding");
+
+            using (var responseStream = await responseMessage.Content.ReadAsStreamAsync())
+            {
+                await responseStream.CopyToAsync(response.Body, StreamCopyBufferSize, context.RequestAborted);
+            }
+        }
+    }
 }
+
+
