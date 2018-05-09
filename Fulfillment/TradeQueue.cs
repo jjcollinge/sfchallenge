@@ -4,6 +4,7 @@ using Microsoft.ServiceFabric.Data.Collections;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Fulfillment
@@ -19,26 +20,26 @@ namespace Fulfillment
             this.queueName = queueName;
         }
 
-        public async Task<string> EnqueueAsync(Trade trade)
+        public async Task<string> EnqueueAsync(Trade trade, CancellationToken cancellationToken)
         {
             IReliableConcurrentQueue<Trade> trades =
              await this.stateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(queueName);
 
             using (var tx = this.stateManager.CreateTransaction())
             {
-                await trades.EnqueueAsync(tx, trade);
+                await trades.EnqueueAsync(tx, trade, cancellationToken);
                 await tx.CommitAsync();
             }
             return trade.Id;
         }
 
-        public async Task<Trade> DequeueAsync(ITransaction tx)
+        public async Task<Trade> DequeueAsync(ITransaction tx, CancellationToken cancellationToken)
         {
             IReliableConcurrentQueue<Trade> transactions =
              await this.stateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(queueName);
 
             Trade transaction = null;
-            var result = await transactions.TryDequeueAsync(tx);
+            var result = await transactions.TryDequeueAsync(tx, cancellationToken);
             if (result.HasValue)
             {
                 transaction = result.Value;

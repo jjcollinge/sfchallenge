@@ -68,7 +68,7 @@ namespace Logger
             using (var tx = this.StateManager.CreateTransaction())
             {
                 // Clear the external log trade store
-                await tradeLogger.ClearAsync();
+                await tradeLogger.ClearAsync(CancellationToken.None);
 
                 // Clear the queue
                 var t = Task.Run(async () => {
@@ -86,16 +86,16 @@ namespace Logger
 
         protected override async Task RunAsync(CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
             IReliableConcurrentQueue<Trade> exportQueue =
              await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
 
             // Take each trade from the queue and
             // insert it into an external trade
             // log store.
-            while (true && !cancellationToken.IsCancellationRequested)
+            while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 using (var tx = this.StateManager.CreateTransaction())
                 {
                     // This can be batched...
@@ -103,7 +103,7 @@ namespace Logger
                     if (result.HasValue)
                     {
                         var trade = result.Value;
-                        await tradeLogger.InsertAsync(trade);
+                        await tradeLogger.InsertAsync(trade, cancellationToken);
 
                         await tx.CommitAsync();
                     }

@@ -49,9 +49,9 @@ namespace Chaos
             // - Update the cluster domain name to match your SF cluster (line 54)
             // - Add your cluster node types to the inclusion list (line 102)
 
-            string clientCertThumb = "7a16201c6df8cec4992925d6f290fd4d31b9a0d8";
-            string serverCertThumb = "7a16201c6df8cec4992925d6f290fd4d31b9a0d8";
-            string clusterDomainName = "win243dbhqilqz.westus.cloudapp.azure.com";
+            string clientCertThumb = "D6426E96E0169B60ED030E53FCD05EAC12AAA1E0";
+            string serverCertThumb = "D6426E96E0169B60ED030E53FCD05EAC12AAA1E0";
+            string clusterDomainName = "dotjson.westeurope.cloudapp.azure.com";
 
             string commonName = $"www.{clusterDomainName}";          
             string clusterEndpoint = $"{clusterDomainName}:19000";
@@ -99,7 +99,7 @@ namespace Chaos
 
                 // All types of faults, restart node, restart code package, restart replica, move primary replica, and move secondary replica will happen
                 // for nodes of type 'FrontEndType'
-                var nodetypeInclusionList = new List<string> { "nt1party" };
+                var nodetypeInclusionList = new List<string> { "nodetype0" };
 
                 // In addition to the faults included by nodetypeInclusionList, 
                 // restart code package, restart replica, move primary replica, move secondary replica faults will happen for 'fabric:/TestApp2'
@@ -127,10 +127,11 @@ namespace Chaos
                 try
                 {
                     client.TestManager.StartChaosAsync(parameters).GetAwaiter().GetResult();
+                    System.Threading.Thread.Sleep(TimeSpan.FromSeconds(30)); // Allow enough time for Chaos engine to start
                 }
                 catch (FabricChaosAlreadyRunningException)
                 {
-                    Console.WriteLine("An instance of Chaos is already running in the cluster. Connect to the cluster and then run Stop-ServiceFabricChaos to stop it.");
+                    Console.WriteLine("An instance of Chaos is already running in the cluster");
                 }
 
                 var filter = new ChaosReportFilter(startTimeUtc, DateTime.MaxValue);

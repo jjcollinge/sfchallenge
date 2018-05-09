@@ -63,7 +63,7 @@ namespace Fulfillment
         public async Task<string> AddTradeAsync(TradeRequestModel tradeRequest)
         {
             Validation.ThrowIfNotValidTradeRequest(tradeRequest);
-            var tradeId = await this.Trades.EnqueueAsync(tradeRequest);
+            var tradeId = await this.Trades.EnqueueAsync(tradeRequest, CancellationToken.None);
             return tradeId;
         }
 
@@ -191,10 +191,10 @@ namespace Fulfillment
 
         protected override async Task RunAsync(CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
             while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 // Throttle loop:
                 // This limit cannot be removed or you will fail an audit.
                 await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
@@ -202,7 +202,7 @@ namespace Fulfillment
                 using (var tx = this.StateManager.CreateTransaction())
                 {
                     Trade trade = null;
-                    trade = await this.Trades.DequeueAsync(tx);
+                    trade = await this.Trades.DequeueAsync(tx, cancellationToken);
 
                     if (trade != null)
                     {

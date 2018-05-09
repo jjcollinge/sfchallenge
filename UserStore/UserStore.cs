@@ -287,7 +287,7 @@ namespace UserStore
                 }
                 else
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(this.backupStore.backupFrequencyInSeconds));
+                    await Task.Delay(TimeSpan.FromSeconds(this.backupStore.backupFrequencyInSeconds), cancellationToken);
                     BackupDescription backupDescription = new BackupDescription(BackupOption.Full, this.BackupCallbackAsync);
                     await this.BackupAsync(backupDescription, TimeSpan.FromHours(1), cancellationToken);
                     backupsTaken++;
