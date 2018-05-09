@@ -98,14 +98,14 @@ namespace Logger
             // log store.
             while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 //Wait to process until logs are received, check anyway if timeout occurs
                 if (exportQueue.Count < 1)
                 {
                     logReceivedEvent.WaitOne(TimeSpan.FromSeconds(5));
                 }
-
-                cancellationToken.ThrowIfCancellationRequested();
-
+               
                 using (var tx = this.StateManager.CreateTransaction())
                 {
                     // This can be batched...
