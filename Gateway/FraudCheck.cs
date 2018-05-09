@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -11,16 +12,30 @@ namespace Gateway
     {
         public static string Check()
         {
-            string hashString = string.Empty;
-            for (int i = 0; i < 500; i++)
+            var token = Guid.NewGuid().ToString();
+            string hashString = RunHash(token);
+            //Generate CPU Load but don't slow down the requests... 
+            Task.Run(() =>
             {
-                byte[] bytes = Encoding.Unicode.GetBytes(Guid.NewGuid().ToString());
-                SHA256Managed hashstring = new SHA256Managed();
-                byte[] hash = hashstring.ComputeHash(bytes);
-                foreach (byte x in hash)
+                for (int i = 0; i < 500; i++)
                 {
-                    hashString += String.Format("{0:x2}", x);
+                    var hash = RunHash(token);
+                    Console.WriteLine(hash);
                 }
+            });
+            
+
+            return hashString;
+        }
+
+        private static string RunHash(string hashString)
+        {
+            byte[] bytes = Encoding.Unicode.GetBytes(Guid.NewGuid().ToString());
+            SHA256Managed hashstring = new SHA256Managed();
+            byte[] hash = hashstring.ComputeHash(bytes);
+            foreach (byte x in hash)
+            {
+                hashString += String.Format("{0:x2}", x);
             }
 
             return hashString;

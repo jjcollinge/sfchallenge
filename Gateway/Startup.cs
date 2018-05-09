@@ -54,10 +54,7 @@ namespace Gateway
                 var exists = context.Request.Headers.TryGetValue(ItemTypeHeader, out var itemType);
                 if (exists)
                 {
-                    string bodyContent = new StreamReader(context.Request.Body).ReadToEnd();
-                    string method = context.Request.Method;
-
-                    var partitionedEndpoint = new Uri($"{forwardingUrl}&PartitionKey={itemType.ToString()}&PartitionKind=Named");
+                    var partitionedEndpoint = new Uri($"{forwardingUrl}?PartitionKey={itemType.ToString()}&PartitionKind=Named");
 
                     using (var requestMessage = context.CreateProxyHttpRequest(partitionedEndpoint))
                     {

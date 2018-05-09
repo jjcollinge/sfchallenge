@@ -138,7 +138,6 @@ namespace Fulfillment
         {
             try
             {
-
                 var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
                 await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/OrderBook/api/orders/ask", content);
             }
@@ -317,7 +316,7 @@ namespace Fulfillment
             return new ServiceReplicaListener[]
             {
                 new ServiceReplicaListener(serviceContext =>
-                    new KestrelCommunicationListener(serviceContext, "ServiceEndpoint", (url, listener) =>
+                    new KestrelCommunicationListener(serviceContext, (url, listener) =>
                     {
                         ServiceEventSource.Current.ServiceMessage(serviceContext, $"Starting Kestrel on {url}");
 
@@ -330,7 +329,7 @@ namespace Fulfillment
                                             .AddSingleton<Fulfillment>(this))
                                     .UseContentRoot(Directory.GetCurrentDirectory())
                                     .UseStartup<Startup>()
-                                    //.UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseUniqueServiceUrl)
+                                    .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseUniqueServiceUrl)
                                     .UseUrls(url)
                                     .Build();
                     }))
