@@ -3,9 +3,9 @@
   <!-- Add your custom configuration sections and parameters here -->
   <Section Name="ClusterConfig">
     <Parameter Name="ReverseProxy_Port" Value="[ReverseProxy_Port]" />
-
-
-    <Parameter Name="MaxBidsPending" Value="[OrderBook_MaxBidsPending]" />
-    <Parameter Name="MaxAsksPending" Value="[OrderBook_MaxAsksPending]" />
+  </Section>
+  <Section Name="OrderBookConfig">
+    <Parameter Name="MaxBidsPending" Value="" />
+    <Parameter Name="MaxAsksPending" Value="" />
   </Section>
 </Settings>

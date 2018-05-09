@@ -77,6 +77,7 @@
         <Settings>
           <Section Name="ClusterConfig">
             <Parameter Name="ReverseProxy_Port" Value="[ReverseProxy_Port]" />
+            <Parameter Name="MaxTradesPending" Value="[Fulfillment_MaxTradesPending]" />
           </Section>
         </Settings>
       </ConfigOverride>

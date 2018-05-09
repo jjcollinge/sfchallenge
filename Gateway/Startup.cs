@@ -31,6 +31,12 @@ namespace Gateway
             // and then route requests to a partition.
             app.Run(async (context) =>
             {
+                if (context.Request.Path == "/")
+                {
+                    context.Response.StatusCode = 502;
+                    await context.Response.WriteAsync($"Invalid Input");
+                    return;
+                }
                 //Complete a CPU intensive fraud check. 
                 FraudCheck.Check();
 

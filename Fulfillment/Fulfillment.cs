@@ -29,6 +29,8 @@ namespace Fulfillment
         private readonly UserStoreClient Users;
         private static readonly HttpClient client = new HttpClient();
         private string reverseProxyPort;
+        private int maxPendingTrades;
+        private AutoResetEvent tradeReceivedEvent = new AutoResetEvent(false);
 
         public Fulfillment(StatefulServiceContext context)
             : base(context)
@@ -51,6 +53,7 @@ namespace Fulfillment
             // Get configuration from our PackageRoot/Config/Setting.xml file
             var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
             reverseProxyPort = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["ReverseProxy_Port"].Value;
+            maxPendingTrades = int.Parse(configurationPackage.Settings.Sections["ClusterConfig"].Parameters["MaxTradesPending"].Value);
         }
 
         /// <summary>
@@ -69,7 +72,7 @@ namespace Fulfillment
                 ServiceEventSource.Current.ServiceMaxPendingLimitHit();
                 throw new MaxPendingTradesExceededException(pendingTrades);
             }
-            var tradeId = await this.Trades.EnqueueAsync(tradeRequest);
+            var tradeId = await this.Trades.EnqueueAsync(tradeRequest, CancellationToken.None);
             tradeReceivedEvent.Set();
             return tradeId;
         }
@@ -160,8 +163,6 @@ namespace Fulfillment
             {
                 ServiceEventSource.Current.ServiceMessage(Context, ex.ToString());
             }
-
-        }
 
         }
 
