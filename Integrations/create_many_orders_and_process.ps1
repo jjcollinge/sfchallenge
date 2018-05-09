@@ -1,5 +1,5 @@
 ﻿Param(
-    [string]$domain="localhost:19081"
+    [string]$domain="lgsfhack3.westeurope.cloudapp.azure.com"
 )
 
 $ordersSvcEndpoint = "http://${domain}/Exchange/Gateway"

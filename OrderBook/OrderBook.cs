@@ -226,6 +226,8 @@ namespace OrderBook
 
             var maxAttempts = 5;
             var attempts = 0;
+            var rand = new Random();
+            
 
             while (true)
             {
@@ -297,7 +299,8 @@ namespace OrderBook
                     HttpResponseMessage res = null;
                     try
                     {
-                        res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Fulfillment/api/trades", content);
+                        var randomParitionId = NextInt64(rand);
+                        res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Fulfillment/api/trades&PartitionKey={randomParitionId.ToString()}&PartitionKind=Int64Range", content);
                     }
                     catch (HttpRequestException ex)
                     {
@@ -366,6 +369,13 @@ namespace OrderBook
                     }
                 }
             }
+        }
+
+        public static Int64 NextInt64(Random rnd)
+        {
+            var buffer = new byte[sizeof(Int64)];
+            rnd.NextBytes(buffer);
+            return BitConverter.ToInt64(buffer, 0);
         }
 
 
