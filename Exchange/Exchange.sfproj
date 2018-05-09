@@ -20,9 +20,11 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="ApplicationPackageRoot\ApplicationManifest.xml" />
+    <None Include="ApplicationParameters\LG.xml" />
     <None Include="ApplicationParameters\Cloud.xml" />
     <None Include="ApplicationParameters\Local.1Node.xml" />
     <None Include="ApplicationParameters\Local.5Node.xml" />
+    <None Include="PublishProfiles\LG.xml" />
     <None Include="PublishProfiles\Cloud.xml" />
     <None Include="PublishProfiles\Local.1Node.xml" />
     <None Include="PublishProfiles\Local.5Node.xml" />
@@ -36,6 +38,11 @@
     <ProjectReference Include="..\UserStore\UserStore.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="..\MongoGuestExe\**\*.*">
+      <Link>ApplicationPackageRoot\MongoGuestExePkg\Code\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+    <Content Include="ApplicationPackageRoot\MongoGuestExePkg\Config\Settings.xml" />
+    <Content Include="ApplicationPackageRoot\MongoGuestExePkg\ServiceManifest.xml" />
     <Content Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />

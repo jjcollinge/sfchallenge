@@ -2,12 +2,14 @@
 <ApplicationManifest xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ApplicationTypeName="ExchangeType" ApplicationTypeVersion="1.0.0" xmlns="http://schemas.microsoft.com/2011/01/fabric">
   <Parameters>
     <!-- Logger parameters -->
+    <Parameter Name="MongoGuestExe_InstanceCount" DefaultValue="1" />
     <Parameter Name="Logger_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="Logger_PartitionCount" DefaultValue="1" />
     <Parameter Name="Logger_DnsName" DefaultValue="logger.exchange" />
     <Parameter Name="Logger_Port" DefaultValue="9082" />
     <Parameter Name="Logger_TargetReplicaSetSize" DefaultValue="3" />
-    <Parameter Name="CosmosDBConnectionString" DefaultValue="" />
+    <Parameter Name="MongoConnectionString" DefaultValue="mongodb://mongo.exchange:27017" />
+    <Parameter Name="MongoEnableSSL" DefaultValue="false" />
     <!-- Gateway parameters -->
     <Parameter Name="Gateway_InstanceCount" DefaultValue="1" />
     <!-- UserStore parameters -->
@@ -24,7 +26,7 @@
     You have an SLA with management to block new trades when 800 existing trades are pending
     Changing this value with fail a system audit. Other approaches much be used to scale 
     -->
-    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="800"/>
+    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="1500" />
     <!-- OrderBook parameters -->
     <Parameter Name="OrderBook_DnsName" DefaultValue="orderbook.exchange" />
     <Parameter Name="OrderBook_Port" DefaultValue="9081" />
@@ -40,12 +42,17 @@
   </Parameters>
   <!-- Import Service Manifests -->
   <ServiceManifestImport>
+    <ServiceManifestRef ServiceManifestName="MongoGuestExePkg" ServiceManifestVersion="1.0.0" />
+    <ConfigOverrides />
+  </ServiceManifestImport>
+  <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="LoggerPkg" ServiceManifestVersion="1.0.0" />
     <ConfigOverrides>
       <ConfigOverride Name="Config">
         <Settings>
-          <Section Name="CosmosDB">
-            <Parameter Name="ConnectionString" Value="[CosmosDBConnectionString]" />
+          <Section Name="DB">
+            <Parameter Name="MongoConnectionString" Value="[MongoConnectionString]" />
+            <Parameter Name="MongoEnableSSL" Value="[MongoEnableSSL]" />
           </Section>
         </Settings>
       </ConfigOverride>
@@ -107,6 +114,11 @@
   </ServiceManifestImport>
   <DefaultServices>
     <!-- Create Gateway Service -->
+    <Service Name="MongoGuestExe" ServiceDnsName="mongo.exchange" ServicePackageActivationMode="ExclusiveProcess">
+      <StatelessService ServiceTypeName="MongoGuestExeType" InstanceCount="[MongoGuestExe_InstanceCount]">
+        <SingletonPartition />
+      </StatelessService>
+    </Service>
     <Service Name="Gateway" ServicePackageActivationMode="ExclusiveProcess">
       <StatelessService ServiceTypeName="GatewayType" InstanceCount="[Gateway_InstanceCount]">
         <SingletonPartition />

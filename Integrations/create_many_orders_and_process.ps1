@@ -1,9 +1,9 @@
 ﻿Param(
-    [string]$domain="localhost"
+    [string]$domain="localhost:19081"
 )
 
-$ordersSvcEndpoint = "http://${domain}:19081/Exchange/Gateway"
-$fulfillmentSvcEndpoint = "http://${domain}:9080"
+$ordersSvcEndpoint = "http://${domain}/Exchange/Gateway"
+$fulfillmentSvcEndpoint = "http://${domain}/Exchange/Fulfillment"
 $bidEndpoint = "${ordersSvcEndpoint}/api/orders/bid"
 $askEndpoint = "${ordersSvcEndpoint}/api/orders/ask"
 $ordersEndpoint = "${ordersSvcEndpoint}/api/orders"
@@ -45,6 +45,7 @@ if($startAskCount -gt 0 -Or $startBidCount -gt 0)
 # Create buyer
 log "creating a new buyer"
 $buyer = @{
+    'ID' = 'buyer'
     'Balance' = 1000000000
     'Quantity' = 100000000
     'Username' = "buyer"
@@ -59,6 +60,7 @@ if ($buyerId -eq "")
 # Create seller
 log "creating a new seller"
 $seller = @{
+    'ID' = 'seller'
     'balance' = 100000000
     'quantity' = 100000000
     'username' = "seller"
@@ -71,7 +73,7 @@ if ($sellerId -eq "")
 }
 
 log "begin adding orders"
-$runCount = 50
+$runCount = 5000
 for ($i = 0; $i -lt $runCount; $i++)
 {
     # Create bid

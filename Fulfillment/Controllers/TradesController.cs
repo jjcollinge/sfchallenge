@@ -27,7 +27,7 @@ namespace Fulfillment.Controllers
         {
             if (IsCoolingDown)
             {
-                await Task.Delay(TimeSpan.FromSeconds(3));
+                await Task.Delay(TimeSpan.FromSeconds(1));
                 return new StatusCodeResult(429);
             }
             try
@@ -47,9 +47,15 @@ namespace Fulfillment.Controllers
             {
                 if (!IsCoolingDown)
                 {
-                    IsCoolingDown = true;
-                    await Task.Delay(TimeSpan.FromSeconds(15));
-                    IsCoolingDown = false;
+                    try
+                    {
+                        IsCoolingDown = true;
+                        await Task.Delay(TimeSpan.FromSeconds(3));
+                    }
+                    finally
+                    {
+                        IsCoolingDown = false;
+                    }
                 }
                 return new StatusCodeResult(429);
             }

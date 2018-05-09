@@ -18,13 +18,16 @@ namespace Logger
         private MongoDBTradeLogger()
         {}
 
-        public static MongoDBTradeLogger Create(string connectionString, string databaseName, string collectionName)
+        public static MongoDBTradeLogger Create(string connectionString, bool enableSSL, string databaseName, string collectionName)
         {
             MongoClientSettings settings = MongoClientSettings.FromUrl(
               new MongoUrl(connectionString)
             );
-            settings.SslSettings =
-              new SslSettings() { EnabledSslProtocols = SslProtocols.Tls12 };
+            if (enableSSL)
+            {
+                settings.SslSettings =
+                  new SslSettings() { EnabledSslProtocols = SslProtocols.Tls12 };
+            }
             var mongoClient = new MongoClient(settings);
 
             var db = new MongoDBTradeLogger();
@@ -46,9 +49,9 @@ namespace Logger
                 var doc = trade.ToBsonDocument();
                 await collection.InsertOneAsync(doc);
             }
-            catch (MongoDB.Driver.MongoWriteException ex)
+            catch (Exception ex)
             {
-                ServiceEventSource.Current.Message($"Error writing trade '{trade.Id}' to MongoDB, error: '{ex.Message}'");
+                ServiceEventSource.Current.Message($"Error writing trade '{trade.Id}' to MongoDB, error: '{ex.Message}' {ex.ToString()}");
             }
         }
 

@@ -27,6 +27,7 @@ namespace Logger
         private const string databaseName = "exchange";
         private const string collectionName = "trades";
         private ITradeLogger tradeLogger;
+        private AutoResetEvent logReceivedEvent = new AutoResetEvent(true);
 
         public Logger(StatefulServiceContext context)
             : base(context)
@@ -43,8 +44,9 @@ namespace Logger
         private void Init()
         {
             ConfigurationPackage configPackage = this.Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
-            String connectionString = configPackage.Settings.Sections["CosmosDB"].Parameters["ConnectionString"].Value;
-            tradeLogger = MongoDBTradeLogger.Create(connectionString, databaseName, collectionName);
+            String connectionString = configPackage.Settings.Sections["DB"].Parameters["MongoConnectionString"].Value;
+            bool.TryParse(configPackage.Settings.Sections["DB"].Parameters["MongoEnableSSL"].Value, out var enableSsl);
+            tradeLogger = MongoDBTradeLogger.Create(connectionString, enableSsl, databaseName, collectionName);
         }
 
         public async Task LogAsync(Trade trade)
@@ -55,6 +57,7 @@ namespace Logger
             using (var tx = this.StateManager.CreateTransaction())
             {
                 // Add trade to log queue
+                logReceivedEvent.Set();
                 await exportQueue.EnqueueAsync(tx, trade);
                 await tx.CommitAsync();
             }
@@ -71,7 +74,8 @@ namespace Logger
                 await tradeLogger.ClearAsync();
 
                 // Clear the queue
-                var t = Task.Run(async () => {
+                var t = Task.Run(async () =>
+                {
                     while (exportQueue.Count > 0)
                     {
                         await exportQueue.TryDequeueAsync(tx);
@@ -96,6 +100,12 @@ namespace Logger
             // log store.
             while (true)
             {
+                //Wait to process until logs are received, check anyway if timeout occurs
+                if (exportQueue.Count < 1)
+                {
+                    logReceivedEvent.WaitOne(TimeSpan.FromSeconds(5));
+                }
+
                 using (var tx = this.StateManager.CreateTransaction())
                 {
                     // This can be batched...

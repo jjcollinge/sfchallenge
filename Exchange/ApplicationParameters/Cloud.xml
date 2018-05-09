@@ -1,6 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Application xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Name="fabric:/Exchange" xmlns="http://schemas.microsoft.com/2011/01/fabric">
   <Parameters>
+    <Parameter Name="MongoGuestExe_InstanceCount" Value="1" />
     <Parameter Name="Logger_PartitionCount" Value="1" />
     <Parameter Name="Logger_MinReplicaSetSize" Value="3" />
     <Parameter Name="Logger_TargetReplicaSetSize" Value="3" />
@@ -13,6 +14,5 @@
     <Parameter Name="OrderBook_PartitionCount" Value="1" />
     <Parameter Name="OrderBook_MinReplicaSetSize" Value="3" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" Value="3" />
-    <Parameter Name="CosmosDBConnectionString" Value="" />
   </Parameters>
 </Application>

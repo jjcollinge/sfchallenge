@@ -16,7 +16,7 @@ namespace OrderBook.Controllers
     [Route("api/[controller]")]
     public class OrdersController : Controller
     {
-        private static bool IsAcceptingNewOrders = true;
+        private static bool IsCoolingDown = false;
         private readonly OrderBook orderBook;
 
         public OrdersController(OrderBook orderBook)
@@ -33,7 +33,8 @@ namespace OrderBook.Controllers
                 var bids = await this.orderBook.GetBidsAsync();
                 var asksCount = asks.Count;
                 var bidsCount = bids.Count;
-                var view = new OrderBookViewModel {
+                var view = new OrderBookViewModel
+                {
                     Asks = asks,
                     Bids = bids,
                     AsksCount = asksCount,
@@ -103,7 +104,7 @@ namespace OrderBook.Controllers
         [HttpPost]
         public async Task<IActionResult> Bid([FromBody] OrderRequestModel order)
         {
-            if (!IsAcceptingNewOrders)
+            if (IsCoolingDown)
             {
                 ServiceEventSource.Current.ServiceMaxPendingCooldown();
                 await Task.Delay(1200);
@@ -134,10 +135,20 @@ namespace OrderBook.Controllers
             }
             catch (MaxOrdersExceededException)
             {
-                IsAcceptingNewOrders = false;
-                await Task.Delay(TimeSpan.FromSeconds(15));
-                IsAcceptingNewOrders = true;
+                if (!IsCoolingDown)
+                {
+                    try
+                    {
+                        IsCoolingDown = false;
+                        await Task.Delay(TimeSpan.FromSeconds(3));
+                    }
+                    finally
+                    {
+                        IsCoolingDown = true;
+                    }
+                }
                 return new StatusCodeResult(429);
+
             }
         }
 
@@ -145,7 +156,7 @@ namespace OrderBook.Controllers
         [HttpPost]
         public async Task<IActionResult> Ask([FromBody] OrderRequestModel order)
         {
-            if (!IsAcceptingNewOrders)
+            if (IsCoolingDown)
             {
                 ServiceEventSource.Current.ServiceMaxPendingCooldown();
                 await Task.Delay(1200);
@@ -176,9 +187,18 @@ namespace OrderBook.Controllers
             }
             catch (MaxOrdersExceededException)
             {
-                IsAcceptingNewOrders = false;
-                await Task.Delay(TimeSpan.FromSeconds(15));
-                IsAcceptingNewOrders = true;
+                if (!IsCoolingDown)
+                {
+                    try
+                    {
+                        IsCoolingDown = false;
+                        await Task.Delay(TimeSpan.FromSeconds(3));
+                    }
+                    finally
+                    {
+                        IsCoolingDown = true;
+                    }
+                }
                 return new StatusCodeResult(429);
             }
         }

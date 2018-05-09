@@ -31,6 +31,7 @@ namespace Fulfillment
         private string loggerEndpoint;
         private int maxPendingTrades;
         private string orderBookEndpoint;
+        private AutoResetEvent tradeReceivedEvent = new AutoResetEvent(true);
 
         public Fulfillment(StatefulServiceContext context)
             : base(context)
@@ -81,6 +82,7 @@ namespace Fulfillment
                 throw new MaxPendingTradesExceededException(pendingTrades);
             }
             var tradeId = await this.Trades.EnqueueAsync(tradeRequest);
+            tradeReceivedEvent.Set();
             return tradeId;
         }
 
@@ -142,9 +144,17 @@ namespace Fulfillment
         /// <returns></returns>
         private async Task ReOrderAskAsync(Order order)
         {
-            var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
-            var addTradeUri = $"{orderBookEndpoint}/api/orders/ask";
-            await client.PostAsync(addTradeUri, content); //TODO: Handle errors
+            try
+            {
+
+                var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
+                var addTradeUri = $"{orderBookEndpoint}/api/orders/ask";
+                await client.PostAsync(addTradeUri, content); //TODO: Handle errors
+            }
+            catch (Exception ex)
+            {
+                ServiceEventSource.Current.ServiceMessage(Context, ex.ToString());
+            }
         }
 
         /// <summary>
@@ -154,9 +164,17 @@ namespace Fulfillment
         /// <returns></returns>
         private async Task ReOrderBidAsync(Order order)
         {
-            var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
-            var addTradeUri = $"{orderBookEndpoint}/api/orders/bid";
-            await client.PostAsync(addTradeUri, content); //TODO: Handle errors
+            try
+            {
+                var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
+                var addTradeUri = $"{orderBookEndpoint}/api/orders/bid";
+                await client.PostAsync(addTradeUri, content); //TODO: Handle errors
+            }
+            catch (Exception ex)
+            {
+                ServiceEventSource.Current.ServiceMessage(Context, ex.ToString());
+            }
+
         }
 
         /// <summary>
@@ -217,7 +235,10 @@ namespace Fulfillment
             {
                 // Throttle loop:
                 // This limit cannot be removed or you will fail an audit.
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                if (await Trades.CountAsync() < 1)
+                {
+                    tradeReceivedEvent.WaitOne(TimeSpan.FromSeconds(5));
+                }
 
                 using (var tx = this.StateManager.CreateTransaction())
                 {
