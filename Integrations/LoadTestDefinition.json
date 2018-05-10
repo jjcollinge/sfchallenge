@@ -1,0 +1,388 @@
+{
+    "id": "86f9f030-a8c7-43d6-ba4c-b9311b53160b",
+    "createdDate": "2018-05-10T13:15:15.030Z",
+    "createdBy": null,
+    "lastModifiedDate": "2018-05-10T13:15:15.030Z",
+    "lastModifiedBy": null,
+    "runSettings": {
+        "duration": 600,
+        "warmUpDuration": 0,
+        "coreCount": 0,
+        "samplingInterval": 15
+    },
+    "loadGenerationGeoLocations": [
+        {
+            "location": "West Europe",
+            "percentage": 100
+        }
+    ],
+    "accessData": null,
+    "staticAgentRunSettings": null,
+    "name": "_temp_sfhack_t1",
+    "testDetails": {
+        "visualStudioLoadTestFileName": "",
+        "scenarios": [
+            {
+                "scenarioName": "Scenario",
+                "loadPattern": {
+                    "maxUsers": 160,
+                    "initialUsers": 1,
+                    "stepDuration": 30,
+                    "stepRampTime": 0,
+                    "stepUsers": 8,
+                    "loadPatternType": 1
+                },
+                "browserMixs": [
+                    {
+                        "browserName": "Internet Explorer 11.0",
+                        "browserPercentage": 60
+                    },
+                    {
+                        "browserName": "Chrome 2",
+                        "browserPercentage": 40
+                    }
+                ],
+                "testMix": [
+                    {
+                        "testName": "Simple",
+                        "urlList": [
+                            {
+                                "label": "createUser1",
+                                "serviceUrl": "http://lgsfhack3.westeurope.cloudapp.azure.com/Exchange/Gateway/api/users ",
+                                "httpMethod": {
+                                    "method": "POST"
+                                },
+                                "httpVersion": {
+                                    "major": 1,
+                                    "minor": 1,
+                                    "build": 0,
+                                    "revision": 0,
+                                    "majorRevision": 0,
+                                    "minorRevision": 0
+                                },
+                                "queryParameters": [],
+                                "requestHeaders": [],
+                                "httpBody": {
+                                    "contentType": "application/json",
+                                    "bodyString": "{\n\"id\": \"user1\",\n\"username\": \"username1\",\n\"quantity\": 10000,\n\"balance\": 10000,\n}",
+                                    "httpBodyType": 1
+                                },
+                                "extractionRules": []
+                            },
+                            {
+                                "label": "createUser2",
+                                "serviceUrl": "http://lgsfhack3.westeurope.cloudapp.azure.com/Exchange/Gateway/api/users",
+                                "httpMethod": {
+                                    "method": "POST"
+                                },
+                                "httpVersion": {
+                                    "major": 1,
+                                    "minor": 1,
+                                    "build": 0,
+                                    "revision": 0,
+                                    "majorRevision": 0,
+                                    "minorRevision": 0
+                                },
+                                "queryParameters": [],
+                                "requestHeaders": [],
+                                "httpBody": {
+                                    "contentType": "application/json",
+                                    "bodyString": "{\n\"id\": \"user2\",\n\"username\": \"username2\",\n\"quantity\": 10000,\n\"balance\": 10000,\n}",
+                                    "httpBodyType": 1
+                                },
+                                "extractionRules": []
+                            },
+                            {
+                                "label": "user1Bid",
+                                "serviceUrl": "http://lgsfhack3.westeurope.cloudapp.azure.com/Exchange/Gateway/api/orders/bid",
+                                "httpMethod": {
+                                    "method": "POST"
+                                },
+                                "httpVersion": {
+                                    "major": 1,
+                                    "minor": 1,
+                                    "build": 0,
+                                    "revision": 0,
+                                    "majorRevision": 0,
+                                    "minorRevision": 0
+                                },
+                                "queryParameters": [],
+                                "requestHeaders": [
+                                    {
+                                        "key": "x-item-type",
+                                        "value": "bitcoin"
+                                    }
+                                ],
+                                "httpBody": {
+                                    "contentType": "application/json",
+                                    "bodyString": "{\n\"value\": 20,\n\"quantity\": 20, \n\"userId\": \"user1\",\n}",
+                                    "httpBodyType": 1
+                                },
+                                "extractionRules": []
+                            },
+                            {
+                                "label": "user1Bid",
+                                "serviceUrl": "http://lgsfhack3.westeurope.cloudapp.azure.com/Exchange/Gateway/api/orders/bid",
+                                "httpMethod": {
+                                    "method": "POST"
+                                },
+                                "httpVersion": {
+                                    "major": 1,
+                                    "minor": 1,
+                                    "build": 0,
+                                    "revision": 0,
+                                    "majorRevision": 0,
+                                    "minorRevision": 0
+                                },
+                                "queryParameters": [],
+                                "requestHeaders": [
+                                    {
+                                        "key": "x-item-type",
+                                        "value": "dogcoin"
+                                    }
+                                ],
+                                "httpBody": {
+                                    "contentType": "application/json",
+                                    "bodyString": "{\n\"value\": 20,\n\"quantity\": 20, \n\"userId\": \"user1\",\n}",
+                                    "httpBodyType": 1
+                                },
+                                "extractionRules": []
+                            },
+                            {
+                                "label": "user1Bid",
+                                "serviceUrl": "http://lgsfhack3.westeurope.cloudapp.azure.com/Exchange/Gateway/api/orders/bid",
+                                "httpMethod": {
+                                    "method": "POST"
+                                },
+                                "httpVersion": {
+                                    "major": 1,
+                                    "minor": 1,
+                                    "build": 0,
+                                    "revision": 0,
+                                    "majorRevision": 0,
+                                    "minorRevision": 0
+                                },
+                                "queryParameters": [],
+                                "requestHeaders": [
+                                    {
+                                        "key": "x-item-type",
+                                        "value": "lawrencecoin"
+                                    }
+                                ],
+                                "httpBody": {
+                                    "contentType": "application/json",
+                                    "bodyString": "{\n\"value\": 20,\n\"quantity\": 20, \n\"userId\": \"user1\",\n}",
+                                    "httpBodyType": 1
+                                },
+                                "extractionRules": []
+                            },
+                            {
+                                "label": "user2Ask",
+                                "serviceUrl": "http://lgsfhack3.westeurope.cloudapp.azure.com/Exchange/Gateway/api/orders/ask",
+                                "httpMethod": {
+                                    "method": "POST"
+                                },
+                                "httpVersion": {
+                                    "major": 1,
+                                    "minor": 1,
+                                    "build": 0,
+                                    "revision": 0,
+                                    "majorRevision": 0,
+                                    "minorRevision": 0
+                                },
+                                "queryParameters": [],
+                                "requestHeaders": [
+                                    {
+                                        "key": "x-item-type",
+                                        "value": "bitcoin"
+                                    }
+                                ],
+                                "httpBody": {
+                                    "contentType": "application/json",
+                                    "bodyString": "{\n\"value\": 20,\n\"quantity\": 20, \n\"userId\": \"user2\",\n}",
+                                    "httpBodyType": 1
+                                },
+                                "extractionRules": []
+                            },
+                            {
+                                "label": "user2Ask",
+                                "serviceUrl": "http://lgsfhack3.westeurope.cloudapp.azure.com/Exchange/Gateway/api/orders/ask",
+                                "httpMethod": {
+                                    "method": "POST"
+                                },
+                                "httpVersion": {
+                                    "major": 1,
+                                    "minor": 1,
+                                    "build": 0,
+                                    "revision": 0,
+                                    "majorRevision": 0,
+                                    "minorRevision": 0
+                                },
+                                "queryParameters": [],
+                                "requestHeaders": [
+                                    {
+                                        "key": "x-item-type",
+                                        "value": "dogcoin"
+                                    }
+                                ],
+                                "httpBody": {
+                                    "contentType": "application/json",
+                                    "bodyString": "{\n\"value\": 20,\n\"quantity\": 20, \n\"userId\": \"user2\",\n}",
+                                    "httpBodyType": 1
+                                },
+                                "extractionRules": []
+                            },
+                            {
+                                "label": "user2Ask",
+                                "serviceUrl": "http://lgsfhack3.westeurope.cloudapp.azure.com/Exchange/Gateway/api/orders/ask",
+                                "httpMethod": {
+                                    "method": "POST"
+                                },
+                                "httpVersion": {
+                                    "major": 1,
+                                    "minor": 1,
+                                    "build": 0,
+                                    "revision": 0,
+                                    "majorRevision": 0,
+                                    "minorRevision": 0
+                                },
+                                "queryParameters": [],
+                                "requestHeaders": [
+                                    {
+                                        "key": "x-item-type",
+                                        "value": "lawrencecoin"
+                                    }
+                                ],
+                                "httpBody": {
+                                    "contentType": "application/json",
+                                    "bodyString": "{\n\"value\": 20,\n\"quantity\": 20, \n\"userId\": \"user2\",\n}",
+                                    "httpBodyType": 1
+                                },
+                                "extractionRules": []
+                            },
+                            {
+                                "label": "user2Ask",
+                                "serviceUrl": "http://lgsfhack3.westeurope.cloudapp.azure.com/Exchange/Gateway/api/orders/ask",
+                                "httpMethod": {
+                                    "method": "POST"
+                                },
+                                "httpVersion": {
+                                    "major": 1,
+                                    "minor": 1,
+                                    "build": 0,
+                                    "revision": 0,
+                                    "majorRevision": 0,
+                                    "minorRevision": 0
+                                },
+                                "queryParameters": [],
+                                "requestHeaders": [
+                                    {
+                                        "key": "x-item-type",
+                                        "value": "jonicoin"
+                                    }
+                                ],
+                                "httpBody": {
+                                    "contentType": "application/json",
+                                    "bodyString": "{\n\"value\": 20,\n\"quantity\": 20, \n\"userId\": \"user2\",\n}",
+                                    "httpBodyType": 1
+                                },
+                                "extractionRules": []
+                            },
+                            {
+                                "label": "user2Ask",
+                                "serviceUrl": "http://lgsfhack3.westeurope.cloudapp.azure.com/Exchange/Gateway/api/orders/ask",
+                                "httpMethod": {
+                                    "method": "POST"
+                                },
+                                "httpVersion": {
+                                    "major": 1,
+                                    "minor": 1,
+                                    "build": 0,
+                                    "revision": 0,
+                                    "majorRevision": 0,
+                                    "minorRevision": 0
+                                },
+                                "queryParameters": [],
+                                "requestHeaders": [
+                                    {
+                                        "key": "x-item-type",
+                                        "value": "anderscoin"
+                                    }
+                                ],
+                                "httpBody": {
+                                    "contentType": "application/json",
+                                    "bodyString": "{\n\"value\": 20,\n\"quantity\": 20, \n\"userId\": \"user2\",\n}",
+                                    "httpBodyType": 1
+                                },
+                                "extractionRules": []
+                            },
+                            {
+                                "label": "user1Bid",
+                                "serviceUrl": "http://lgsfhack3.westeurope.cloudapp.azure.com/Exchange/Gateway/api/orders/bid",
+                                "httpMethod": {
+                                    "method": "POST"
+                                },
+                                "httpVersion": {
+                                    "major": 1,
+                                    "minor": 1,
+                                    "build": 0,
+                                    "revision": 0,
+                                    "majorRevision": 0,
+                                    "minorRevision": 0
+                                },
+                                "queryParameters": [],
+                                "requestHeaders": [
+                                    {
+                                        "key": "x-item-type",
+                                        "value": "jonicoin"
+                                    }
+                                ],
+                                "httpBody": {
+                                    "contentType": "application/json",
+                                    "bodyString": "{\n\"value\": 20,\n\"quantity\": 20, \n\"userId\": \"user1\",\n}",
+                                    "httpBodyType": 1
+                                },
+                                "extractionRules": []
+                            },
+                            {
+                                "label": "user1Bid",
+                                "serviceUrl": "http://lgsfhack3.westeurope.cloudapp.azure.com/Exchange/Gateway/api/orders/bid",
+                                "httpMethod": {
+                                    "method": "POST"
+                                },
+                                "httpVersion": {
+                                    "major": 1,
+                                    "minor": 1,
+                                    "build": 0,
+                                    "revision": 0,
+                                    "majorRevision": 0,
+                                    "minorRevision": 0
+                                },
+                                "queryParameters": [],
+                                "requestHeaders": [
+                                    {
+                                        "key": "x-item-type",
+                                        "value": "anderscoin"
+                                    }
+                                ],
+                                "httpBody": {
+                                    "contentType": "application/json",
+                                    "bodyString": "{\n\"value\": 20,\n\"quantity\": 20, \n\"userId\": \"user1\",\n}",
+                                    "httpBodyType": 1
+                                },
+                                "extractionRules": []
+                            }
+                        ],
+                        "dataSources": [],
+                        "globalParameters": [],
+                        "mixPercentage": 100,
+                        "testType": 0
+                    }
+                ]
+            }
+        ]
+    },
+    "loadTestType": 0,
+    "description": null,
+    "loadTestDefinitionSource": "Team Services portal"
+}
