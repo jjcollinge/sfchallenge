@@ -3,12 +3,12 @@
 )
 
 $ordersSvcEndpoint = "http://${domain}/Exchange/Gateway"
-$fulfillmentSvcEndpoint = "http://${domain}/Exchange/Fulfillment"
+$fulfillmentSvcEndpoint = "http://${domain}/Exchange/Gateway"
 $bidEndpoint = "${ordersSvcEndpoint}/api/orders/bid"
 $askEndpoint = "${ordersSvcEndpoint}/api/orders/ask"
 $ordersEndpoint = "${ordersSvcEndpoint}/api/orders"
-$transfersEndpoint = "${fulfillmentSvcEndpoint}/api/trades?PartitionKey=1&PartitionKind=Int64Range"
-$usersEndpoint = "${fulfillmentSvcEndpoint}/api/users?PartitionKey=1&PartitionKind=Int64Range"
+$transfersEndpoint = "${fulfillmentSvcEndpoint}/api/trades"
+$usersEndpoint = "${fulfillmentSvcEndpoint}/api/users"
 
 function log
 {
@@ -19,34 +19,6 @@ function log
 
 log "orders endpoint: ${ordersSvcEndpoint}"
 log "fulfillment endpoint: ${fulfillmentSvcEndpoint}"
-
-
-<#
-Requires work to make this support partitioned workloads...
-
-$users = Invoke-RestMethod -Method Get -Uri $usersEndpoint
-if ($users.Count -gt 0)
-{
-   
-    foreach ($user in $users)  
-    {
-        $userId = $user.id
-        Invoke-RestMethod -Method Delete -Uri "$usersEndpoint/$userId"
-    }
-}
-
-
-$orders = Invoke-RestMethod -Method Get -Uri $ordersEndpoint 
-$startAskCount = $orders.asksCount
-$startBidCount = $orders.bidsCount
-
-if($startAskCount -gt 0 -Or $startBidCount -gt 0)
-{
-    
-    
-    Invoke-RestMethod -Method Delete -Uri $ordersEndpoint
-}
-#>
 
 # Create buyer
 log "creating a new buyer"

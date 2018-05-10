@@ -19,7 +19,7 @@ namespace Gateway
         private const string ForwarderForHeader = "X-Forwarded-Host";
         private const string ItemTypeHeader = "x-item-type";
         public static HttpClient Client = new HttpClient();
-
+        private const string UserIdHeader = "x-userid";
 
         public void ConfigureServices(IServiceCollection services)
         {
@@ -46,15 +46,32 @@ namespace Gateway
                 //Complete a CPU intensive fraud check. 
                 FraudCheck.Check();
 
-                string forwardingUrl = ForwardingUrl(context);
 
                 // If requests have a header of 'x-item-type' then redirect them to the correct partition 
                 // using the 'Named' partition scheme in Service Fabric and it's Reverse proxy.
                 // https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-reverseproxy
-                var exists = context.Request.Headers.TryGetValue(ItemTypeHeader, out var itemType);
-                if (exists)
+                var itemTypeExists = context.Request.Headers.TryGetValue(ItemTypeHeader, out var itemType);
+                if (itemTypeExists)
                 {
+                    //Handle bid and ask requests with parition
+                    string forwardingUrl = ForwardingUrl(context, "OrderBook");
+
                     var partitionedEndpoint = new Uri($"{forwardingUrl}?PartitionKey={itemType.ToString()}&PartitionKind=Named");
+
+                    using (var requestMessage = context.CreateProxyHttpRequest(partitionedEndpoint))
+                    {
+                        using (var responseMessage = await context.SendProxyHttpRequest(requestMessage))
+                        {
+                            await context.CopyProxyHttpResponse(responseMessage);
+                        }
+                    }
+                }
+                else if (context.Request.Path.Value.Contains("/api/user") || context.Request.Path.Value.Contains("/api/trades"))
+                {
+                    //Handle user or trade requests with/without parition
+                    string forwardingUrl = ForwardingUrl(context, "Fulfillment");
+
+                    var partitionedEndpoint = new Uri($"{forwardingUrl}?PartitionKey=1&PartitionKind=Int64Range");
 
                     using (var requestMessage = context.CreateProxyHttpRequest(partitionedEndpoint))
                     {
@@ -66,6 +83,9 @@ namespace Gateway
                 }
                 else
                 {
+                    //Handle bid and ask requests without parition
+                    string forwardingUrl = ForwardingUrl(context, "OrderBook");
+
                     using (var requestMessage = context.CreateProxyHttpRequest(new Uri(forwardingUrl)))
                     {
                         using (var responseMessage = await context.SendProxyHttpRequest(requestMessage))
@@ -77,7 +97,7 @@ namespace Gateway
             });
         }
 
-        private static string ForwardingUrl(HttpContext context)
+        private static string ForwardingUrl(HttpContext context, string serviceName)
         {
             var forwarderForExists = context.Request.Headers.TryGetValue(ForwarderForHeader, out var forwarderFor);
 
@@ -87,7 +107,6 @@ namespace Gateway
                 sourceHost = forwarderFor;
             }
             string applicationInstanceName = Gateway.StaticContext.CodePackageActivationContext.ApplicationName.Replace("fabric:/", "");
-            string serviceName = "OrderBook";
             var endpoint = $"http://{sourceHost}/{applicationInstanceName}/{serviceName}{context.Request.Path.Value}";
             if (context.Request.QueryString.HasValue)
             {
