@@ -93,29 +93,55 @@ namespace Logger
             IReliableConcurrentQueue<Trade> exportQueue =
              await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
 
-            // Take each trade from the queue and
-            // insert it into an external trade
-            // log store.
+            // Take each trade from the queue and insert
+            // it into an external trade log store.
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                //Wait to process until logs are received, check anyway if timeout occurs
-                if (exportQueue.Count < 1)
+                try
                 {
-                    logReceivedEvent.WaitOne(TimeSpan.FromSeconds(5));
+                    // Wait to process until logs are received, check anyway if timeout occurs
+                    if (exportQueue.Count < 1)
+                    {
+                        logReceivedEvent.WaitOne(TimeSpan.FromSeconds(5));
+                    }
+                }
+                catch (FabricNotReadableException)
+                {
+                    // Fabric is not yet readable - this is a transient exception
+                    // Backing off temporarily before retrying
+                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                    continue;
                 }
                
                 using (var tx = this.StateManager.CreateTransaction())
                 {
-                    // This can be batched...
-                    var result = await exportQueue.TryDequeueAsync(tx, cancellationToken);
-                    if (result.HasValue)
+                    try
                     {
-                        var trade = result.Value;
-                        await tradeLogger.InsertAsync(trade, cancellationToken);
+                        // This can be batched...
+                        var result = await exportQueue.TryDequeueAsync(tx, cancellationToken);
+                        if (result.HasValue)
+                        {
+                            var trade = result.Value;
+                            await tradeLogger.InsertAsync(trade, cancellationToken);
 
-                        await tx.CommitAsync();
+                            await tx.CommitAsync();
+                        }
+                    }
+                    catch (FabricNotPrimaryException)
+                    {
+                        // Attempted to perform write on a non
+                        // primary replica.
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric cannot perform write as it is not the primary replica");
+                        return;
+                    }
+                    catch (FabricNotReadableException)
+                    {
+                        // Fabric is not yet readable - this is a transient exception
+                        // Backing off temporarily before retrying
+                        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                        continue;
                     }
                 }
             }

@@ -38,13 +38,13 @@ namespace Fulfillment
             IReliableConcurrentQueue<Trade> transactions =
              await this.stateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(queueName);
 
-            Trade transaction = null;
+            Trade trade = null;
             var result = await transactions.TryDequeueAsync(tx, cancellationToken);
             if (result.HasValue)
             {
-                transaction = result.Value;
+                trade = result.Value;
             }
-            return transaction;
+            return trade;
         }
 
         public async Task<long> CountAsync()

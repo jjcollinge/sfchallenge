@@ -168,17 +168,8 @@ namespace UserStore
 
         protected override Task RunAsync(CancellationToken cancellationToken)
         {
-            try
-            {
-                ServiceEventSource.Current.ServiceMessage(this.Context, "inside RunAsync for Inventory Service");
-
-                return this.PeriodicTakeBackupAsync(cancellationToken);
-            }
-            catch (Exception e)
-            {
-                ServiceEventSource.Current.ServiceMessage(this.Context, "RunAsync Failed, {0}", e);
-                throw;
-            }
+            ServiceEventSource.Current.ServiceMessage(this.Context, "Running backup of user store periodically");
+            return this.PeriodicTakeBackupAsync(cancellationToken);
         }
 
         #region Backup and Restore
@@ -285,18 +276,38 @@ namespace UserStore
 
             while (true)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (this.backupStorageType == BackupManagerType.None)
+                try
                 {
-                    break;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (this.backupStorageType == BackupManagerType.None)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(this.backupStore.backupFrequencyInSeconds), cancellationToken);
+                        BackupDescription backupDescription = new BackupDescription(BackupOption.Full, this.BackupCallbackAsync);
+                        await this.BackupAsync(backupDescription, TimeSpan.FromHours(1), cancellationToken);
+                        backupsTaken++;
+                        //ServiceEventSource.Current.ServiceMessage(this.Context, "Backup {0} taken", backupsTaken);
+                    }
                 }
-                else
+                catch (FabricNotPrimaryException)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(this.backupStore.backupFrequencyInSeconds), cancellationToken);
-                    BackupDescription backupDescription = new BackupDescription(BackupOption.Full, this.BackupCallbackAsync);
-                    await this.BackupAsync(backupDescription, TimeSpan.FromHours(1), cancellationToken);
-                    backupsTaken++;
-                    //ServiceEventSource.Current.ServiceMessage(this.Context, "Backup {0} taken", backupsTaken);
+                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric cannot perform write as it is not the primary replica");
+                    return;
+                }
+                catch (FabricNotReadableException)
+                {
+                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric is not currently readable, aborting and will retry");
+                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                    continue;
+                }
+                catch (InvalidOperationException)
+                {
+                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid operation performed, aborting and will retry");
+                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                    continue;
                 }
             }
         }

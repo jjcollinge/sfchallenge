@@ -30,7 +30,7 @@ namespace Fulfillment
         private static readonly HttpClient client = new HttpClient();
         private string reverseProxyPort;
         private int maxPendingTrades;
-        private AutoResetEvent tradeReceivedEvent = new AutoResetEvent(false);
+        private static ManualResetEventSlim tradeReceivedEvent = new ManualResetEventSlim(false);
 
         public Fulfillment(StatefulServiceContext context)
             : base(context)
@@ -221,79 +221,113 @@ namespace Fulfillment
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // Throttle loop:
-                // This limit cannot be removed or you will fail an audit.
-                if (await Trades.CountAsync() < 1)
+                try
                 {
-                    tradeReceivedEvent.WaitOne(TimeSpan.FromSeconds(5));
+                    // Throttle loop:
+                    // This limit cannot be removed or you will fail an audit.
+                    if (await Trades.CountAsync() < 1)
+                    {
+                        tradeReceivedEvent.Wait(TimeSpan.FromSeconds(5), cancellationToken);
+                        tradeReceivedEvent.Reset();
+                    }
+                }
+                catch (FabricNotReadableException)
+                {
+                    // Fabric is not yet readable - this is a transient exception
+                    // Backing off temporarily before retrying
+                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                    continue;
                 }
 
                 using (var tx = this.StateManager.CreateTransaction())
                 {
-                    Trade trade = null;
-                    trade = await this.Trades.DequeueAsync(tx, cancellationToken);
-
-                    if (trade != null)
+                    try
                     {
-                        // Get the buyer and seller associated with the trade
-                        var seller = await Users.GetUserAsync(trade.Ask.UserId);
-                        var buyer = await Users.GetUserAsync(trade.Bid.UserId);
+                        var trade = await this.Trades.DequeueAsync(tx, cancellationToken);
 
-                        // If the trade is invalid, we'll throw an exception
-                        // and remove it from the queue. If there is a transient
-                        // failure, we'll abort and put it back on the queue.
-                        try
+                        if (trade != null)
                         {
-                            Validation.ThrowIfNotValidTrade(trade, seller, buyer);
-                        }
-                        catch (BadBuyerException ex)
-                        {
-                            await tx.CommitAsync();
-                            ServiceEventSource.Current.Message($"Dropping bad trade. Reason: {ex.Message}");
+                            // Get the buyer and seller associated with the trade
+                            var seller = await Users.GetUserAsync(trade.Ask.UserId);
+                            var buyer = await Users.GetUserAsync(trade.Bid.UserId);
 
-                            // Buyer was invalid, Seller's ask may
-                            // still be valid.
-                            if (trade != null)
+                            // If the trade is invalid, we'll throw an exception
+                            // and remove it from the queue. If there is a transient
+                            // failure, we'll abort and put it back on the queue.
+                            try
                             {
-                                await ReOrderAskAsync(trade.Ask);
-                                ServiceEventSource.Current.Message($"Reordering ask {trade.Ask.Id} for new match");
+                                Validation.ThrowIfNotValidTrade(trade, seller, buyer);
                             }
-                            continue;
-                        }
-                        catch (BadSellerException ex)
-                        {
-                            await tx.CommitAsync();
-                            ServiceEventSource.Current.Message($"Dropping bad trade. Reason: {ex.Message}");
-
-                            // Seller was invalid, Buyer's bid may
-                            // still be valid.
-                            if (trade != null)
+                            catch (BadBuyerException ex)
                             {
-                                ServiceEventSource.Current.Message($"Reordering bid {trade.Bid.Id} for new match");
-                                await ReOrderBidAsync(trade.Bid);
-                            }
-                            continue;
-                        }
+                                await tx.CommitAsync();
+                                ServiceEventSource.Current.Message($"Dropping bad trade. Reason: {ex.Message}");
 
-                        var applied = await ExecuteTradeAsync(tx, trade, seller, buyer);
-                        // Applied indicates both buyer and seller have been
-                        // successfully updated and the trade has been logged.
-                        // We can now commit the transaction to release our lock
-                        // on the queue.
-                        if (applied)
-                        {
-                            await tx.CommitAsync();
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} completed");
+                                // Buyer was invalid, Seller's ask may
+                                // still be valid.
+                                if (trade != null)
+                                {
+                                    await ReOrderAskAsync(trade.Ask);
+                                    ServiceEventSource.Current.Message($"Reordering ask {trade.Ask.Id} for new match");
+                                }
+                                continue;
+                            }
+                            catch (BadSellerException ex)
+                            {
+                                await tx.CommitAsync();
+                                ServiceEventSource.Current.Message($"Dropping bad trade. Reason: {ex.Message}");
+
+                                // Seller was invalid, Buyer's bid may
+                                // still be valid.
+                                if (trade != null)
+                                {
+                                    ServiceEventSource.Current.Message($"Reordering bid {trade.Bid.Id} for new match");
+                                    await ReOrderBidAsync(trade.Bid);
+                                }
+                                continue;
+                            }
+
+                            var applied = await ExecuteTradeAsync(tx, trade, seller, buyer);
+                            if (applied)
+                            {
+                                // Applied indicates both buyer and seller have been
+                                // successfully updated and the trade has been logged.
+                                // We can now commit the transaction to release our lock
+                                // on the queue.
+                                await tx.CommitAsync();
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} completed");
+                            }
+                            else
+                            {
+                                // Atleast one of the buyer or seller failed to update
+                                // or we failed to log the trade.
+                                // We will abort the transaction and assume a transient
+                                // failure.
+                                tx.Abort();
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} aborted");
+                            }
                         }
-                        // Atleast one of the buyer or seller failed to update
-                        // or we failed to log the trade.
-                        // We will abort the transaction and assume a transient
-                        // failure.
-                        else
-                        {
-                            tx.Abort();
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} aborted");
-                        }
+                    }
+                    catch(FabricNotPrimaryException)
+                    {
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric cannot perform write as it is not the primary replica");
+                        return;
+                    }
+                    catch (FabricNotReadableException)
+                    {
+                        // Fabric is not yet readable - this is a transient exception
+                        // Backing off temporarily before retrying
+                        tx.Abort();
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric is not currently readable, aborting and will retry");
+                        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                        continue;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        tx.Abort();
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid operation performed, aborting and will retry");
+                        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                        continue;
                     }
                 }
             }

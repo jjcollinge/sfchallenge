@@ -73,7 +73,7 @@ if ($sellerId -eq "")
 }
 
 log "begin adding orders"
-$runCount = 5000
+$runCount = 250
 for ($i = 0; $i -lt $runCount; $i++)
 {
     # Create bid
