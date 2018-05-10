@@ -135,7 +135,13 @@
     <!-- Create OrderBook Service -->
     <Service Name="OrderBook" ServiceDnsName="orderbook.exchange">
       <StatefulService ServiceTypeName="OrderBookType" TargetReplicaSetSize="[OrderBook_TargetReplicaSetSize]" MinReplicaSetSize="[OrderBook_MinReplicaSetSize]">
-        <SingletonPartition />
+        <NamedPartition>
+          <Partition Name="bitcoin" />
+          <Partition Name="dogcoin" />
+          <Partition Name="lawrencecoin" />
+          <Partition Name="jonicoin" />
+          <Partition Name="anderscoin" />
+        </NamedPartition>
       </StatefulService>
     </Service>
     <!-- Create Logger Service -->
