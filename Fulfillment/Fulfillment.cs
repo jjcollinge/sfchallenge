@@ -176,7 +176,7 @@ namespace Fulfillment
         {
             var randomParitionId = NextInt64(rand);
             var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
-            var res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Logger/api/logger&PartitionKey={randomParitionId.ToString()}&PartitionKind=Int64Range", content); //TODO: Handle errors
+            var res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Logger/api/logger?PartitionKey={randomParitionId.ToString()}&PartitionKind=Int64Range", content); //TODO: Handle errors
             return res.IsSuccessStatusCode;
         }
 

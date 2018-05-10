@@ -21,7 +21,6 @@ namespace Gateway
         private const string ForwarderForHeader = "X-Forwarded-Host";
         private const string ItemTypeHeader = "x-item-type";
         public static HttpClient Client = new HttpClient();
-        private const string UserIdHeader = "x-userid";
 
         public void ConfigureServices(IServiceCollection services)
         {
