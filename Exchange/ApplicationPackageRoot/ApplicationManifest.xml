@@ -26,7 +26,7 @@
     You have an SLA with management to block new trades when 800 existing trades are pending
     Changing this value with fail a system audit. Other approaches much be used to scale 
     -->
-    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="400" />
+    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="600" />
     <!-- OrderBook parameters -->
     <Parameter Name="OrderBook_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="OrderBook_PartitionCount" DefaultValue="1" />
@@ -36,8 +36,8 @@
     You have an SLA with management to block new orders when 200 existing orders are pending
     Changing this value with fail a system audit. Other approaches much be used to scale 
     -->
-    <Parameter Name="OrderBook_MaxBidsPending" DefaultValue="200" />
-    <Parameter Name="OrderBook_MaxAsksPending" DefaultValue="200" />
+    <Parameter Name="OrderBook_MaxBidsPending" DefaultValue="300" />
+    <Parameter Name="OrderBook_MaxAsksPending" DefaultValue="300" />
   </Parameters>
   <!-- Import Service Manifests -->
   <ServiceManifestImport>
@@ -123,6 +123,13 @@
     </Service>
     <Service Name="UserStore" ServicePackageActivationMode="ExclusiveProcess">
       <StatefulService ServiceTypeName="UserStoreType" TargetReplicaSetSize="[UserStore_TargetReplicaSetSize]" MinReplicaSetSize="[UserStore_MinReplicaSetSize]">
+        <!--<NamedPartition>
+          <Partition Name="bitcoin" />
+          <Partition Name="dogcoin" />
+          <Partition Name="lawrencecoin" />
+          <Partition Name="jonicoin" />
+          <Partition Name="anderscoin" />
+        </NamedPartition>-->
         <UniformInt64Partition PartitionCount="[UserStore_PartitionCount]" LowKey="-9223372036854775808" HighKey="9223372036854775807" />
       </StatefulService>
     </Service>
@@ -135,13 +142,7 @@
     <!-- Create OrderBook Service -->
     <Service Name="OrderBook" ServiceDnsName="orderbook.exchange">
       <StatefulService ServiceTypeName="OrderBookType" TargetReplicaSetSize="[OrderBook_TargetReplicaSetSize]" MinReplicaSetSize="[OrderBook_MinReplicaSetSize]">
-        <NamedPartition>
-          <Partition Name="bitcoin" />
-          <Partition Name="dogcoin" />
-          <Partition Name="lawrencecoin" />
-          <Partition Name="jonicoin" />
-          <Partition Name="anderscoin" />
-        </NamedPartition>
+        <SingletonPartition />
       </StatefulService>
     </Service>
     <!-- Create Logger Service -->
