@@ -31,6 +31,7 @@ namespace Fulfillment
         private string reverseProxyPort;
         private int maxPendingTrades;
         private static ManualResetEventSlim tradeReceivedEvent = new ManualResetEventSlim(false);
+        private Random rand = new Random();
 
         public Fulfillment(StatefulServiceContext context)
             : base(context)
@@ -137,7 +138,6 @@ namespace Fulfillment
         {
             try
             {
-
                 var content = new StringContent(JsonConvert.SerializeObject(order), Encoding.UTF8, "application/json");
                 await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/OrderBook/api/orders/ask", content);
             }
@@ -174,9 +174,17 @@ namespace Fulfillment
         /// <returns></returns>
         private async Task<bool> LogAsync(Trade trade)
         {
+            var randomParitionId = NextInt64(rand);
             var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
-            var res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Logger/api/logger", content); //TODO: Handle errors
+            var res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Logger/api/logger&PartitionKey={randomParitionId.ToString()}&PartitionKind=Int64Range", content); //TODO: Handle errors
             return res.IsSuccessStatusCode;
+        }
+
+        public static Int64 NextInt64(Random rnd)
+        {
+            var buffer = new byte[sizeof(Int64)];
+            rnd.NextBytes(buffer);
+            return BitConverter.ToInt64(buffer, 0);
         }
 
         /// <summary>
@@ -342,7 +350,7 @@ namespace Fulfillment
             return new ServiceReplicaListener[]
             {
                 new ServiceReplicaListener(serviceContext =>
-                    new KestrelCommunicationListener(serviceContext, "ServiceEndpoint", (url, listener) =>
+                    new KestrelCommunicationListener(serviceContext, (url, listener) =>
                     {
                         ServiceEventSource.Current.ServiceMessage(serviceContext, $"Starting Kestrel on {url}");
 
@@ -355,7 +363,7 @@ namespace Fulfillment
                                             .AddSingleton<Fulfillment>(this))
                                     .UseContentRoot(Directory.GetCurrentDirectory())
                                     .UseStartup<Startup>()
-                                    //.UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseUniqueServiceUrl)
+                                    .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseUniqueServiceUrl)
                                     .UseUrls(url)
                                     .Build();
                     }))

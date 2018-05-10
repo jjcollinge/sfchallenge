@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,7 +13,7 @@ namespace Gateway
         public static string Check()
         {
             string hashString = string.Empty;
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 500; i++)
             {
                 byte[] bytes = Encoding.Unicode.GetBytes(Guid.NewGuid().ToString());
                 SHA256Managed hashstring = new SHA256Managed();

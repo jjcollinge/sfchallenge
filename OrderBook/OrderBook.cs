@@ -226,11 +226,12 @@ namespace OrderBook
 
             var maxFailedAttempts = 5;
             var failedAttemptsCount = 0;
+            var rand = new Random();
 
             Order maxBid = null;
             Order minAsk = null;
             Order match = null;
-
+            
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -274,7 +275,6 @@ namespace OrderBook
                             ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid Asks generated from {minAsk.Id}, dropping.");
                             await this.asks.RemoveAsync(minAsk);
                             continue;
-
                         }
                         catch (InvalidBidException)
                         {
@@ -297,7 +297,8 @@ namespace OrderBook
                         HttpResponseMessage res = null;
                         try
                         {
-                            res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Fulfillment/api/trades", content, cancellationToken);
+                            var randomParitionId = NextInt64(rand);
+                            res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Fulfillment/api/trades?PartitionKey={randomParitionId.ToString()}&PartitionKind=Int64Range", content, cancellationToken);
                         }
                         catch (HttpRequestException ex)
                         {
@@ -394,6 +395,13 @@ namespace OrderBook
             }
         }
 
+        public static Int64 NextInt64(Random rnd)
+        {
+            var buffer = new byte[sizeof(Int64)];
+            rnd.NextBytes(buffer);
+            return BitConverter.ToInt64(buffer, 0);
+        }
+
 
         /// <summary>
         /// Optional override to create listeners (like tcp, http) for this service instance.
@@ -404,7 +412,7 @@ namespace OrderBook
             return new ServiceReplicaListener[]
             {
                 new ServiceReplicaListener(serviceContext =>
-                    new KestrelCommunicationListener(serviceContext, "ServiceEndpoint", (url, listener) =>
+                    new KestrelCommunicationListener(serviceContext, (url, listener) =>
                     {
                         ServiceEventSource.Current.ServiceMessage(serviceContext, $"Starting Kestrel on {url}");
 
@@ -416,7 +424,7 @@ namespace OrderBook
                                             .AddSingleton<OrderBook>(this))
                                     .UseContentRoot(Directory.GetCurrentDirectory())
                                     .UseStartup<Startup>()
-                                    //.UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseUniqueServiceUrl)
+                                    .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseReverseProxyIntegration)
                                     .UseUrls(url)
                                     .Build();
                     }))
