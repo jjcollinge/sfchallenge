@@ -4,10 +4,11 @@
     <!-- Cluster parameters -->
     <Parameter Name="ReverseProxy_Port" DefaultValue="19081" />
     <!-- Logger parameters -->
-    <Parameter Name="MongoGuestExe_InstanceCount" DefaultValue="1" />
     <Parameter Name="Logger_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="Logger_PartitionCount" DefaultValue="1" />
     <Parameter Name="Logger_TargetReplicaSetSize" DefaultValue="3" />
+    <!-- MongoDB parameters -->
+    <Parameter Name="MongoGuestExe_InstanceCount" DefaultValue="1" />
     <Parameter Name="MongoConnectionString" DefaultValue="mongodb://mongo.exchange:27017" />
     <Parameter Name="MongoEnableSSL" DefaultValue="false" />
     <!-- Gateway parameters -->
@@ -69,6 +70,9 @@
   <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="UserStorePkg" ServiceManifestVersion="1.0.0" />
     <ConfigOverrides />
+    <Policies>
+      <RunAsPolicy CodePackageRef="Code" UserRef="LocalAdmin" />
+    </Policies>
   </ServiceManifestImport>
   <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="FulfillmentPkg" ServiceManifestVersion="1.0.0" />
@@ -147,4 +151,20 @@
     <!-- Ideally ServiceDnsName would be parameterized but due to this issue: https://github.com/Azure/service-fabric-issues/issues/561
          this is not possible with DefaultServices - it would be ok if deployed using POSH, sftcl or REST.-->
   </DefaultServices>
+  <Principals>
+    <Groups>
+      <Group Name="LocalAdminGroup">
+        <Membership>
+          <SystemGroup Name="Administrators" />
+        </Membership>
+      </Group>
+    </Groups>
+    <Users>
+      <User Name="LocalAdmin">
+        <MemberOf>
+          <Group NameRef="LocalAdminGroup" />
+        </MemberOf>
+      </User>
+    </Users>
+  </Principals>
 </ApplicationManifest>

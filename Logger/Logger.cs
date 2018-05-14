@@ -27,7 +27,7 @@ namespace Logger
         private const string databaseName = "exchange";
         private const string collectionName = "trades";
         private ITradeLogger tradeLogger;
-        private AutoResetEvent logReceivedEvent = new AutoResetEvent(true);
+        private const int backOffDurationInSec = 2;
 
         public Logger(StatefulServiceContext context)
             : base(context)
@@ -57,7 +57,7 @@ namespace Logger
             using (var tx = this.StateManager.CreateTransaction())
             {
                 // Add trade to log queue
-                logReceivedEvent.Set();
+                //logReceivedEvent.Set();
                 await exportQueue.EnqueueAsync(tx, trade);
                 await tx.CommitAsync();
             }
@@ -83,7 +83,7 @@ namespace Logger
                     await tx.CommitAsync();
                     return true;
                 });
-                var timeout = Task.Delay(TimeSpan.FromSeconds(60));
+                var timeout = Task.Delay(TimeSpan.FromSeconds(30));
                 await Task.WhenAny(t, timeout);
             }
         }
@@ -104,15 +104,19 @@ namespace Logger
                     // Wait to process until logs are received, check anyway if timeout occurs
                     if (exportQueue.Count < 1)
                     {
-                        logReceivedEvent.WaitOne(TimeSpan.FromSeconds(5));
+                        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
                     }
                 }
                 catch (FabricNotReadableException)
                 {
                     // Fabric is not yet readable - this is a transient exception
                     // Backing off temporarily before retrying
-                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                    await BackOff(cancellationToken);
                     continue;
+                }
+                catch (FabricNotPrimaryException)
+                {
+                    return;
                 }
                
                 using (var tx = this.StateManager.CreateTransaction())
@@ -124,10 +128,19 @@ namespace Logger
                         if (result.HasValue)
                         {
                             var trade = result.Value;
-                            await tradeLogger.InsertAsync(trade, cancellationToken);
 
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Writing trade {trade.Id} to log");
+                            await tradeLogger.InsertAsync(trade, cancellationToken);
                             await tx.CommitAsync();
                         }
+                    }
+                    catch (LoggerDisconnectedException)
+                    {
+                        // Logger may have lost connection
+                        // Back off and retry connection
+                        await BackOff(cancellationToken);
+                        Init();
+                        continue;
                     }
                     catch (FabricNotPrimaryException)
                     {
@@ -140,11 +153,25 @@ namespace Logger
                     {
                         // Fabric is not yet readable - this is a transient exception
                         // Backing off temporarily before retrying
-                        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                        await BackOff(cancellationToken);
+                        continue;
+                    }
+                    catch (InsertFailedException ex)
+                    {
+                        // Insert failed, assume connection problem and transient.
+                        // backoff and retry
+                        ServiceEventSource.Current.ServiceMessage(this.Context, ex.Message);
+                        await BackOff(cancellationToken);
                         continue;
                     }
                 }
             }
+        }
+
+        private static async Task BackOff(CancellationToken cancellationToken)
+        {
+            ServiceEventSource.Current.Message($"Logger is backing off for {backOffDurationInSec} seconds");
+            await Task.Delay(TimeSpan.FromSeconds(backOffDurationInSec), cancellationToken);
         }
 
         /// <summary>
@@ -169,7 +196,7 @@ namespace Logger
                                             .AddSingleton<Logger>(this))
                                     .UseContentRoot(Directory.GetCurrentDirectory())
                                     .UseStartup<Startup>()
-                                    .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseUniqueServiceUrl)
+                                    .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseReverseProxyIntegration)
                                     .UseUrls(url)
                                     .Build();
                     }))

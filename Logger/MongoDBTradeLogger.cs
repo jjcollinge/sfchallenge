@@ -11,57 +11,60 @@ using System.Threading.Tasks;
 
 namespace Logger
 {
-    public class MongoDBTradeLogger: ITradeLogger
+    public class MongoDBTradeLogger : ITradeLogger
     {
-        private IMongoDatabase database;
-        private string collectionName;
+        private IMongoCollection<BsonDocument> collection;
 
         private MongoDBTradeLogger()
-        {}
+        { }
 
         public static MongoDBTradeLogger Create(string connectionString, bool enableSSL, string databaseName, string collectionName)
         {
             MongoClientSettings settings = MongoClientSettings.FromUrl(
               new MongoUrl(connectionString)
             );
+
             if (enableSSL)
             {
                 settings.SslSettings =
                   new SslSettings() { EnabledSslProtocols = SslProtocols.Tls12 };
             }
-            var mongoClient = new MongoClient(settings);
 
-            var db = new MongoDBTradeLogger();
-            db.database = mongoClient.GetDatabase(databaseName);
-            db.collectionName = collectionName;
-            return db;
+            var client = new MongoClient(settings);
+            var db = client.GetDatabase(databaseName);  // auto creates if not exist
+            var collection = db.GetCollection<BsonDocument>(collectionName);    // auto creates if not exist
+
+            var logger = new MongoDBTradeLogger()
+            {
+                collection = collection
+            };
+            return logger;
         }
 
         public async Task InsertAsync(Trade trade, CancellationToken cancellationToken)
         {
-            if (database.GetCollection<BsonDocument>(this.collectionName) == null)
-            {
-                await database.CreateCollectionAsync(this.collectionName);
-            }
-
-            var collection = database.GetCollection<BsonDocument>(this.collectionName);
             try
             {
                 var doc = trade.ToBsonDocument();
                 await collection.InsertOneAsync(doc, null, cancellationToken);
             }
+            catch (MongoDuplicateKeyException)
+            {
+                return; // Key already stored
+            }
+            catch (MongoConnectionException ex)
+            {
+                throw new LoggerDisconnectedException($"Mongo connection issue {ex.Message}");
+            }
             catch (Exception ex)
             {
-                ServiceEventSource.Current.Message($"Error writing trade '{trade.Id}' to MongoDB, error: '{ex.Message}' {ex.ToString()}");
+                throw new InsertFailedException($"Error writing trade '{trade.Id}' to MongoDB, error: '{ex.Message}' {ex.ToString()}");
             }
         }
 
         public async Task ClearAsync(CancellationToken cancellationToken)
         {
-            if (database.GetCollection<BsonDocument>(this.collectionName) != null)
-            {
-                await database.DropCollectionAsync(this.collectionName, cancellationToken);
-            }
+            await collection.Database.DropCollectionAsync(collection.CollectionNamespace.CollectionName, cancellationToken);
         }
     }
 }

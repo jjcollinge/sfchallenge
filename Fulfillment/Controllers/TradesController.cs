@@ -49,6 +49,8 @@ namespace Fulfillment.Controllers
                 {
                     try
                     {
+                        ServiceEventSource.Current.Message("Max pending transactions limit reached, cooling down");
+
                         IsCoolingDown = true;
                         await Task.Delay(TimeSpan.FromSeconds(3));
                     }

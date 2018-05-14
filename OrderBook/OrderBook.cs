@@ -21,6 +21,7 @@ using System.Collections.Immutable;
 using System.Runtime.Serialization;
 using System.Net.Http.Headers;
 using System.Fabric.Description;
+using System.Net;
 
 namespace OrderBook
 {
@@ -29,7 +30,6 @@ namespace OrderBook
     /// </summary>
     public class OrderBook : StatefulService
     {
-
         // Names used as key to identify reliable dictionary in the state manager
         public const string AskBookName = "books/asks";
         public const string BidBookName = "books/bids";
@@ -38,12 +38,12 @@ namespace OrderBook
         private OrderSet asks;
         private OrderSet bids;
 
-        // HTTP details for communicating with Fulfillment service
         private static readonly HttpClient client = new HttpClient();
         private string reverseProxyPort;
 
         private int maxPendingAsks;
         private int maxPendingBids;
+        private const int backOffDurationInSec = 2;
 
         public OrderBook(StatefulServiceContext context)
             : base(context)
@@ -53,8 +53,7 @@ namespace OrderBook
             this.bids = new OrderSet(this.StateManager, BidBookName);
         }
 
-        // This constructor is used during unit testing by setting a mock
-        // IReliableStateManagerReplica
+        // This constructor is used during unit testing by setting a mock IReliableStateManagerReplica
         public OrderBook(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
@@ -224,14 +223,12 @@ namespace OrderBook
                   .Accept
                   .Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-            var maxFailedAttempts = 5;
-            var failedAttemptsCount = 0;
             var rand = new Random();
 
             Order maxBid = null;
             Order minAsk = null;
             Order match = null;
-            
+
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -249,10 +246,9 @@ namespace OrderBook
                     maxBid = this.bids.GetMaxOrder();
                     minAsk = this.asks.GetMinOrder();
 
-                    // Check if match
                     if (IsMatch(maxBid, minAsk))
                     {
-                        ServiceEventSource.Current.ServiceMessage(this.Context, $"New match: order {maxBid.Id} and order {minAsk.Id}");
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"New match: bid {maxBid.Id} and ask {minAsk.Id}");
 
                         try
                         {
@@ -263,16 +259,35 @@ namespace OrderBook
                             (var matchingAsk, var leftOverAsk) = SplitAsk(maxBid, minAsk);
                             if (leftOverAsk != null)
                             {
-                                await AddAskAsync(leftOverAsk); // Add the left over ask as a new order
+                                try
+                                {
+                                    await AddAskAsync(leftOverAsk); // Add the left over ask as a new order
+                                }
+                                catch (FabricNotPrimaryException ex)
+                                {
+                                    ServiceEventSource.Current.ServiceException(this.Context, "Failed to add left over ask as fabric is not primary", ex);
+                                    return;
+                                }
+                                catch (FabricException ex)
+                                {
+                                    ServiceEventSource.Current.ServiceException(this.Context, "Failed to add left over ask as fabric exception throw", ex);
+                                    await BackOff(cancellationToken);
+                                    continue;
+                                }
+                                catch (MaxOrdersExceededException ex)
+                                {
+                                    ServiceEventSource.Current.ServiceException(this.Context, "Failed to add left over ask as max orders exceeded", ex);
+                                    await BackOff(cancellationToken);
+                                    continue;
+                                }
                             }
                             match = matchingAsk;
-
                         }
                         catch (InvalidAskException)
                         {
                             // The ask did not meet our validation criteria.
                             // The bid may still be valid so we'll leave it.
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid Asks generated from {minAsk.Id}, dropping.");
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Dropping invalid Asks generated from.");
                             await this.asks.RemoveAsync(minAsk);
                             continue;
                         }
@@ -280,7 +295,7 @@ namespace OrderBook
                         {
                             // The bid did not meet our validation criteria.
                             // The ask may still be valid so we'll leave it.
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid Bids generated from {maxBid.Id}, dropping.");
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Droping invalid Bids generated from.");
                             await this.bids.RemoveAsync(maxBid);
                             continue;
 
@@ -292,7 +307,7 @@ namespace OrderBook
                             Bid = maxBid,
                         };
 
-                        // Send the trade to our fulfillment service for fulfillment.
+                        // Send the trade request to our fulfillment service to complete.
                         var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
                         HttpResponseMessage res = null;
                         try
@@ -305,21 +320,41 @@ namespace OrderBook
                             // Exception thrown when attempting to make HTTP POST to fulfillment API.
                             // Possibly a DNS, network connectivity or timeout issue.
                             ServiceEventSource.Current.ServiceMessage(this.Context, $"Error sending trade to fulfillment service, error: '{ex.Message}'");
-
-                            // Log the error and retry after a given delay
-                            failedAttemptsCount++;
-                            if (failedAttemptsCount >= maxFailedAttempts)
-                            {
-                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Attempts to send trade to fulfillment service limit {maxFailedAttempts} exceeded, terminating with error.");
-                                throw new Exception("OrderBook cannot contact Fulfillment service.");
-                            }
-                            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                            await BackOff(cancellationToken);
+                            continue;
+                        }
+                        catch (TaskCanceledException)
+                        {
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Request to fulfillment service timed out, backing off and retrying.");
+                            await BackOff(cancellationToken);
                             continue;
                         }
 
-                        // If the response is successful, assume trade is safe to remove.
-                        if (res != null && res.IsSuccessStatusCode)
+                        if (res?.StatusCode == HttpStatusCode.BadRequest)
                         {
+                            await LogBadRequest(res);
+                            using (var tx = this.StateManager.CreateTransaction())
+                            {
+                                await this.asks.RemoveAsync(tx, minAsk);
+                                await this.bids.RemoveAsync(tx, maxBid);
+                                await tx.CommitAsync();
+                            }
+                            continue;
+                        }
+                        if (res?.StatusCode == HttpStatusCode.Gone)
+                        {
+                            await LogBadRequest(res);
+                            continue;
+                        }
+                        if (res?.StatusCode == (HttpStatusCode)429)
+                        {
+                            await LogBadRequest(res);
+                            await BackOff(cancellationToken);
+                            continue;
+                        }
+                        if (res?.IsSuccessStatusCode == true)
+                        {
+                            // If the response is successful, assume orders are safe to remove.
                             using (var tx = this.StateManager.CreateTransaction())
                             {
                                 try
@@ -347,30 +382,22 @@ namespace OrderBook
                                 {
                                     tx.Abort();
                                     ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid operation performed, aborting and will retry");
-                                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                                    await BackOff(cancellationToken);
                                     continue;
                                 }
                                 catch (FabricNotReadableException)
                                 {
                                     tx.Abort();
                                     ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric is not currently readable, aborting and will retry");
-                                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                                    await BackOff(cancellationToken);
                                     continue;
                                 }
                             }
                         }
                         else
                         {
-                            // Error response from fulfillment service, likely a transient error so we'll back off and try again shortly.
-                            failedAttemptsCount++;
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error response from fulfillment service #{failedAttemptsCount}: Response code {res.StatusCode}");
-
-                            if (failedAttemptsCount >= maxFailedAttempts)
-                            {
-                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Attempts to send trade to fulfillment service limit {maxFailedAttempts} exceeded, terminating with error.");
-                                throw new Exception("OrderBook failed to send trade to fulfillment service.");
-                            }
-                            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                            await LogBadRequest(res);
+                            await BackOff(cancellationToken);
                             continue;
                         }
                     }
@@ -378,13 +405,13 @@ namespace OrderBook
                 catch (FabricNotReadableException)
                 {
                     ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric is not currently readable, aborting and will retry");
-                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                    await BackOff(cancellationToken);
                     continue;
                 }
                 catch (InvalidOperationException)
                 {
                     ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid operation performed, aborting and will retry");
-                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                    await BackOff(cancellationToken);
                     continue;
                 }
                 catch (FabricNotPrimaryException)
@@ -393,6 +420,17 @@ namespace OrderBook
                     return;
                 }
             }
+        }
+
+        private static async Task BackOff(CancellationToken cancellationToken)
+        {
+            ServiceEventSource.Current.Message($"OrderBook is backing off for {backOffDurationInSec} seconds");
+            await Task.Delay(TimeSpan.FromSeconds(backOffDurationInSec), cancellationToken);
+        }
+
+        private async Task LogBadRequest(HttpResponseMessage res)
+        {
+            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error, fulfillment service '{res.StatusCode}': {await res.Content.ReadAsStringAsync()}");
         }
 
         public static Int64 NextInt64(Random rnd)
