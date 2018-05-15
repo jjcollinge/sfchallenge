@@ -6,9 +6,19 @@
     <IsServiceFabricServiceProject>True</IsServiceFabricServiceProject>
     <RuntimeIdentifier>win7-x64</RuntimeIdentifier>
     <Platforms>x64</Platforms>
+    <ApplicationInsightsResourceId>/subscriptions/995c6481-7ddc-4dac-afd4-33545d96cf29/resourcegroups/jocollin/providers/microsoft.insights/components/jocollin</ApplicationInsightsResourceId>
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="ApplicationInsights.config" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="ApplicationInsights.config" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.4.0" />
     <PackageReference Include="Microsoft.ApplicationInsights.ServiceFabric.Native" Version="2.1.1-beta1" />
     <PackageReference Include="Microsoft.ServiceFabric" Version="6.2.274" />
     <PackageReference Include="Microsoft.ServiceFabric.Data" Version="3.1.274" />
@@ -19,6 +29,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\UserStore.Interface\UserStore.Interface.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <WCFMetadata Include="Connected Services" />
   </ItemGroup>
 
 </Project>

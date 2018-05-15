@@ -15,6 +15,8 @@ using Common;
 using Microsoft.ServiceFabric.Data.Collections;
 using System.Security;
 using MongoDB.Bson;
+using Microsoft.ApplicationInsights.Extensibility;
+using Microsoft.ApplicationInsights.ServiceFabric;
 
 namespace Logger
 {
@@ -193,9 +195,11 @@ namespace Logger
                                         services => services
                                             .AddSingleton<StatefulServiceContext>(serviceContext)
                                             .AddSingleton<IReliableStateManager>(this.StateManager)
-                                            .AddSingleton<Logger>(this))
+                                            .AddSingleton<Logger>(this)
+                                            .AddSingleton<ITelemetryInitializer>((serviceProvider) => FabricTelemetryInitializerExtension.CreateFabricTelemetryInitializer(serviceContext)))
                                     .UseContentRoot(Directory.GetCurrentDirectory())
                                     .UseStartup<Startup>()
+                                    .UseApplicationInsights()
                                     .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseReverseProxyIntegration)
                                     .UseUrls(url)
                                     .Build();
