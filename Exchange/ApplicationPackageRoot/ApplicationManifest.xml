@@ -27,7 +27,7 @@
     You have an SLA with management to block new trades when 800 existing trades are pending
     Changing this value with fail a system audit. Other approaches much be used to scale 
     -->
-    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="600" />
+    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="700" />
     <!-- OrderBook parameters -->
     <Parameter Name="OrderBook_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="OrderBook_PartitionCount" DefaultValue="1" />
@@ -37,8 +37,8 @@
     You have an SLA with management to block new orders when 200 existing orders are pending
     Changing this value with fail a system audit. Other approaches much be used to scale 
     -->
-    <Parameter Name="OrderBook_MaxBidsPending" DefaultValue="300" />
-    <Parameter Name="OrderBook_MaxAsksPending" DefaultValue="300" />
+    <Parameter Name="OrderBook_MaxBidsPending" DefaultValue="130" />
+    <Parameter Name="OrderBook_MaxAsksPending" DefaultValue="130" />
   </Parameters>
   <!-- Import Service Manifests -->
   <ServiceManifestImport>
