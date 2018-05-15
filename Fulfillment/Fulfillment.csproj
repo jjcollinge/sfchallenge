@@ -24,6 +24,7 @@
     <PackageReference Include="Microsoft.ServiceFabric.Data" Version="3.1.274" />
     <PackageReference Include="Microsoft.ServiceFabric.Services" Version="3.1.274" />
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="2.0.3" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="2.4.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -24,6 +24,7 @@
     <PackageReference Include="Microsoft.ServiceFabric.Services" Version="3.1.274" />
     <PackageReference Include="Microsoft.ServiceFabric.Diagnostics.Internal" Version="3.1.274" />
     <PackageReference Include="MongoDB.Driver" Version="2.7.0-beta0001" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="2.4.0" />
   </ItemGroup>
 
   <ItemGroup>

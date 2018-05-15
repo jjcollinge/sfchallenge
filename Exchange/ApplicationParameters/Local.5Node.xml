@@ -5,7 +5,7 @@
     <Parameter Name="Logger_PartitionCount" Value="1" />
     <Parameter Name="Logger_MinReplicaSetSize" Value="3" />
     <Parameter Name="Logger_TargetReplicaSetSize" Value="3" />
-    <Parameter Name="UserStore_PartitionCount" Value="5" />
+    <Parameter Name="UserStore_PartitionCount" Value="1" />
     <Parameter Name="UserStore_MinReplicaSetSize" Value="3" />
     <Parameter Name="UserStore_TargetReplicaSetSize" Value="3" />
     <Parameter Name="Fulfillment_PartitionCount" Value="1" />
