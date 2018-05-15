@@ -49,6 +49,11 @@ namespace Common
         [DataMember]
         public IEnumerable<String> TradeIds { get; private set; }
 
+        public User AddTrade(string tradeId)
+        {
+            return new User(Id, Username, Quantity, Balance, ((IImmutableList<string>)TradeIds).Add(tradeId));
+        }
+
         public bool Equals(User other)
         {
             if (other == null) return false;

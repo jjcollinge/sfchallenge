@@ -6,19 +6,4 @@
   </Section>
   <!-- This is used for securing StateManager's replication traffic. -->
   <Section Name="ReplicatorSecurityConfig" />
-  <Section Name="Inventory.Service.Settings">
-    <Parameter Name="BackupMode" Value="local" />
-  </Section>
-  <Section Name="Inventory.Service.BackupSettings.Azure">
-    <Parameter Name="BackupAccountName" Value="" />
-    <Parameter Name="PrimaryKeyForBackupAccount" Value="" />
-    <Parameter Name="BlobServiceEndpointAddress" Value="" />
-    <Parameter Name="BackupFrequencyInSeconds" Value="30" />
-    <Parameter Name="MaxBackupsToKeep" Value="5" />
-  </Section>
-  <Section Name="Inventory.Service.BackupSettings.Local">
-    <Parameter Name="BackupArchivalPath" Value="C:\temp" />
-    <Parameter Name="BackupFrequencyInSeconds" Value="10" />
-    <Parameter Name="MaxBackupsToKeep" Value="5" />
-  </Section>
 </Settings>

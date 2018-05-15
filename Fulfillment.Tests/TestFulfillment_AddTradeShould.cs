@@ -37,6 +37,28 @@ namespace Fulfillment.Tests
         }
 
         [Fact]
+        public async Task AddTooManyTradesToQueue()
+        {
+            var context = Helpers.GetMockContext();
+            var stateManager = new MockReliableStateManager();
+            var service = new Fulfillment(context, stateManager);
+            var ask = new Order(10, 10, "user1");
+            var bid = new Order(10, 10, "user2");
+            var request = new TradeRequestModel
+            {
+                Ask = ask,
+                Bid = bid,
+            };
+            await Assert.ThrowsAsync<MaxPendingTradesExceededException>(async () =>
+            {
+                for (int i = 0; i < 20; i++)
+                {
+                    await service.AddTradeAsync(request);
+                }
+            });
+        }
+
+        [Fact]
         public async Task ThrowIfAskQuantityIsLowerThanBidQuantity()
         {
             var context = Helpers.GetMockContext();

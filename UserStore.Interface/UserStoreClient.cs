@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Fabric;
+using System.Fabric.Query;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Common;
@@ -22,7 +24,7 @@ namespace UserStore.Interface
             var settings = new OperationRetrySettings(
                 maxRetryBackoffIntervalOnNonTransientErrors: TimeSpan.FromSeconds(2.0), 
                 maxRetryBackoffIntervalOnTransientErrors: TimeSpan.FromSeconds(2.0), 
-                defaultMaxRetryCount: 5);
+                defaultMaxRetryCount: 3);
 
             _serviceProxyFactory = new ServiceProxyFactory(settings);
 
@@ -48,17 +50,27 @@ namespace UserStore.Interface
             using (var client = new FabricClient())
             {
                 var partitions = await client.QueryManager.GetPartitionListAsync(_userStoreServiceUri);
-
+                var tasks = new List<Task<List<User>>>();
                 foreach (var partition in partitions)
                 {
-                    var partitionInformation = (Int64RangePartitionInformation)partition.PartitionInformation;
-                    var userStoreProxy = _serviceProxyFactory.CreateServiceProxy<IUserStore>(_userStoreServiceUri, new ServicePartitionKey(partitionInformation.LowKey));
-
-                    users.AddRange(await userStoreProxy.GetUsersAsync());
+                    tasks.Add(GetUsersInPartition(partition));
+                }
+                var result = await Task.WhenAll(tasks);
+                for (var i = 0; i < result.Length; i++)
+                {
+                    users = users.Concat(result[i]).ToList();
                 }
             }
 
             return users;
+        }
+
+        private async Task<List<User>> GetUsersInPartition(Partition partition)
+        {
+            var partitionInformation = (Int64RangePartitionInformation)partition.PartitionInformation;
+            var userStoreProxy = _serviceProxyFactory.CreateServiceProxy<IUserStore>(_userStoreServiceUri, new ServicePartitionKey(partitionInformation.LowKey));
+            var usersInPartition = await userStoreProxy.GetUsersAsync();
+            return usersInPartition;
         }
 
         public async Task<bool> DeleteUserAsync(string userId)

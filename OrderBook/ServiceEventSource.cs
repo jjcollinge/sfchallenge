@@ -83,6 +83,25 @@ namespace OrderBook
             }
         }
 
+        [NonEvent]
+        public void ServiceException(ServiceContext serviceContext, string message, Exception ex)
+        {
+            if (this.IsEnabled())
+            {
+
+                string finalMessage = string.Format(message, ex.ToString());
+                ServiceMessage(
+                    serviceContext.ServiceName.ToString(),
+                    serviceContext.ServiceTypeName,
+                    GetReplicaOrInstanceId(serviceContext),
+                    serviceContext.PartitionId,
+                    serviceContext.CodePackageActivationContext.ApplicationName,
+                    serviceContext.CodePackageActivationContext.ApplicationTypeName,
+                    serviceContext.NodeContext.NodeName,
+                    finalMessage);
+            }
+        }
+
         // For very high-frequency events it might be advantageous to raise events using WriteEventCore API.
         // This results in more efficient parameter handling, but requires explicit allocation of EventData structure and unsafe code.
         // To enable this code path, define UNSAFE conditional compilation symbol and turn on unsafe code support in project properties.
@@ -152,6 +171,20 @@ namespace OrderBook
         public void ServiceRequestStop(string requestTypeName, string exception = "")
         {
             WriteEvent(ServiceRequestStopEventId, requestTypeName, exception);
+        }
+
+        private const int MaxPendingLimitReached = 7;
+        [Event(MaxPendingLimitReached, Level = EventLevel.Critical, Message = "Max pending limit reached! Consider partitioning further")]
+        public void ServiceMaxPendingLimitHit()
+        {
+            WriteEvent(MaxPendingLimitReached);
+        }
+
+        private const int MaxPendingLimitCooldown = 8;
+        [Event(MaxPendingLimitCooldown, Level = EventLevel.Critical, Message = "Cooling down after max pending limit reached! Consider partitioning further")]
+        public void ServiceMaxPendingCooldown()
+        {
+            WriteEvent(MaxPendingLimitCooldown);
         }
         #endregion
 

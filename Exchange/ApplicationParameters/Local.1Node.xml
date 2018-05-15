@@ -4,20 +4,18 @@
     <Parameter Name="Logger_PartitionCount" Value="1" />
     <Parameter Name="Logger_MinReplicaSetSize" Value="1" />
     <Parameter Name="Logger_TargetReplicaSetSize" Value="1" />
+    <Parameter Name="Gateway_InstanceCount" Value="1" />
     <Parameter Name="UserStore_PartitionCount" Value="1" />
     <Parameter Name="UserStore_MinReplicaSetSize" Value="1" />
     <Parameter Name="UserStore_TargetReplicaSetSize" Value="1" />
     <Parameter Name="Fulfillment_PartitionCount" Value="1" />
     <Parameter Name="Fulfillment_MinReplicaSetSize" Value="1" />
     <Parameter Name="Fulfillment_TargetReplicaSetSize" Value="1" />
-    <Parameter Name="Fulfillment_DnsName" Value="localhost" />
-    <Parameter Name="OrderBook_DnsName" Value="localhost" />
     <Parameter Name="OrderBook_PartitionCount" Value="1" />
     <Parameter Name="OrderBook_MinReplicaSetSize" Value="1" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" Value="1" />
-    <Parameter Name="CosmosDBConnectionString" Value="" />
-    <Parameter Name="Logger_DnsName" Value="localhost" />
-    <Parameter Name="Fulfillment_DnsName" Value="localhost" />
-    <Parameter Name="OrderBook_DnsName" Value="localhost" />
+    <Parameter Name="ReverseProxy_Port" Value="19081" />
+    <Parameter Name="MongoConnectionString" Value="mongodb://localhost:27017" />
+    <Parameter Name="MongoEnableSSL" Value="false" />
   </Parameters>
 </Application>

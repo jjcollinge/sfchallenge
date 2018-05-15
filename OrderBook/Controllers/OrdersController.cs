@@ -16,6 +16,7 @@ namespace OrderBook.Controllers
     [Route("api/[controller]")]
     public class OrdersController : Controller
     {
+        private static bool IsCoolingDown = false;
         private readonly OrderBook orderBook;
 
         public OrdersController(OrderBook orderBook)
@@ -32,7 +33,8 @@ namespace OrderBook.Controllers
                 var bids = await this.orderBook.GetBidsAsync();
                 var asksCount = asks.Count;
                 var bidsCount = bids.Count;
-                var view = new OrderBookViewModel {
+                var view = new OrderBookViewModel
+                {
                     Asks = asks,
                     Bids = bids,
                     AsksCount = asksCount,
@@ -102,6 +104,13 @@ namespace OrderBook.Controllers
         [HttpPost]
         public async Task<IActionResult> Bid([FromBody] OrderRequestModel order)
         {
+            if (IsCoolingDown)
+            {
+                ServiceEventSource.Current.ServiceMaxPendingCooldown();
+                await Task.Delay(1200);
+                return new StatusCodeResult(429);
+            }
+
             try
             {
                 var orderId = await this.orderBook.AddBidAsync(order);
@@ -109,19 +118,37 @@ namespace OrderBook.Controllers
             }
             catch (InvalidAskException ex)
             {
+                ServiceEventSource.Current.ServiceException(orderBook.Context, "Invalid ask", ex);
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
+            }
+            catch (FabricNotPrimaryException ex)
+            {
+                ServiceEventSource.Current.ServiceException(orderBook.Context, "NotPrimary", ex);
+
+                return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
+            }
+            catch (FabricException ex)
+            {
+                ServiceEventSource.Current.ServiceException(orderBook.Context, "FabricException", ex);
+
+                return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
             catch (MaxOrdersExceededException)
             {
+                if (!IsCoolingDown)
+                {
+                    try
+                    {
+                        IsCoolingDown = false;
+                        await Task.Delay(TimeSpan.FromSeconds(3));
+                    }
+                    finally
+                    {
+                        IsCoolingDown = true;
+                    }
+                }
                 return new StatusCodeResult(429);
-            }
-            catch (FabricNotPrimaryException)
-            {
-                return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
-            }
-            catch (FabricException)
-            {
-                return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
+
             }
         }
 
@@ -129,6 +156,13 @@ namespace OrderBook.Controllers
         [HttpPost]
         public async Task<IActionResult> Ask([FromBody] OrderRequestModel order)
         {
+            if (IsCoolingDown)
+            {
+                ServiceEventSource.Current.ServiceMaxPendingCooldown();
+                await Task.Delay(1200);
+                return new StatusCodeResult(429);
+            }
+
             try
             {
                 var orderId = await this.orderBook.AddAskAsync(order);
@@ -136,19 +170,36 @@ namespace OrderBook.Controllers
             }
             catch (InvalidAskException ex)
             {
+                ServiceEventSource.Current.ServiceException(orderBook.Context, "Invalid ask", ex);
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
+            }
+            catch (FabricNotPrimaryException ex)
+            {
+                ServiceEventSource.Current.ServiceException(orderBook.Context, "NotPrimary", ex);
+
+                return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
+            }
+            catch (FabricException ex)
+            {
+                ServiceEventSource.Current.ServiceException(orderBook.Context, "FabricException", ex);
+
+                return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
             catch (MaxOrdersExceededException)
             {
+                if (!IsCoolingDown)
+                {
+                    try
+                    {
+                        IsCoolingDown = false;
+                        await Task.Delay(TimeSpan.FromSeconds(3));
+                    }
+                    finally
+                    {
+                        IsCoolingDown = true;
+                    }
+                }
                 return new StatusCodeResult(429);
-            }
-            catch (FabricNotPrimaryException)
-            {
-                return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
-            }
-            catch (FabricException)
-            {
-                return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
         }
     }

@@ -19,10 +19,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <None Include="ApplicationPackageRoot\ApplicationManifest_Partitioned.xml" />
     <None Include="ApplicationPackageRoot\ApplicationManifest.xml" />
+    <None Include="ApplicationParameters\MoreGateways.xml" />
+    <None Include="ApplicationParameters\Partitioned.xml" />
     <None Include="ApplicationParameters\Cloud.xml" />
     <None Include="ApplicationParameters\Local.1Node.xml" />
     <None Include="ApplicationParameters\Local.5Node.xml" />
+    <None Include="PublishProfiles\LG.xml" />
     <None Include="PublishProfiles\Cloud.xml" />
     <None Include="PublishProfiles\Local.1Node.xml" />
     <None Include="PublishProfiles\Local.5Node.xml" />
@@ -31,15 +35,22 @@
   <ItemGroup>
     <ProjectReference Include="..\Logger\Logger.csproj" />
     <ProjectReference Include="..\Fulfillment\Fulfillment.csproj" />
+    <ProjectReference Include="..\Gateway\Gateway.csproj" />
     <ProjectReference Include="..\OrderBook\OrderBook.csproj" />
     <ProjectReference Include="..\UserStore\UserStore.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="..\MongoGuestExe\**\*.*">
+      <Link>ApplicationPackageRoot\MongoGuestExePkg\Code\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+    <Content Include="ApplicationPackageRoot\MongoGuestExePkg\Config\Settings.xml" />
+    <Content Include="ApplicationPackageRoot\MongoGuestExePkg\ServiceManifest.xml" />
     <Content Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
   <PropertyGroup>
     <ApplicationProjectTargetsPath>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Service Fabric Tools\Microsoft.VisualStudio.Azure.Fabric.ApplicationProject.targets</ApplicationProjectTargetsPath>
+    <PackageOutputFolder>true</PackageOutputFolder>
   </PropertyGroup>
   <Import Project="$(ApplicationProjectTargetsPath)" Condition="Exists('$(ApplicationProjectTargetsPath)')" />
   <Import Project="..\packages\Microsoft.VisualStudio.Azure.Fabric.MSBuild.1.6.5\build\Microsoft.VisualStudio.Azure.Fabric.Application.targets" Condition="Exists('..\packages\Microsoft.VisualStudio.Azure.Fabric.MSBuild.1.6.5\build\Microsoft.VisualStudio.Azure.Fabric.Application.targets')" />

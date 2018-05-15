@@ -13,6 +13,8 @@ namespace Fulfillment.Controllers
     public class TradesController : Controller
     {
         private Fulfillment fulfillment;
+        // Not thread safe as worst case is cooldown lasting slightly longer than required
+        private static bool IsCoolingDown = false;
 
         public TradesController(Fulfillment fulfillment)
         {
@@ -23,6 +25,11 @@ namespace Fulfillment.Controllers
         [HttpPost]
         public async Task<IActionResult> PostAsync([FromBody] TradeRequestModel tradeRequest)
         {
+            if (IsCoolingDown)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1));
+                return new StatusCodeResult(429);
+            }
             try
             {
                 var tradeId = await this.fulfillment.AddTradeAsync(tradeRequest);
@@ -36,11 +43,30 @@ namespace Fulfillment.Controllers
             {
                 return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
             }
+            catch (MaxPendingTradesExceededException)
+            {
+                if (!IsCoolingDown)
+                {
+                    try
+                    {
+                        ServiceEventSource.Current.Message("Max pending transactions limit reached, cooling down");
+
+                        IsCoolingDown = true;
+                        await Task.Delay(TimeSpan.FromSeconds(3));
+                    }
+                    finally
+                    {
+                        IsCoolingDown = false;
+                    }
+                }
+                return new StatusCodeResult(429);
+            }
             catch (FabricException)
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
         }
+
 
         [HttpGet]
         public async Task<IActionResult> GetAsync()

@@ -1,9 +1,9 @@
 ﻿Param(
-    [string]$domain="localhost"
+    [string]$domain="localhost:19081"
 )
 
-$ordersSvcEndpoint = "http://${domain}:9081"
-$fulfillmentSvcEndpoint = "http://${domain}:9080"
+$ordersSvcEndpoint = "http://${domain}/Exchange/Gateway"
+$fulfillmentSvcEndpoint = "http://${domain}/Exchange/Gateway"
 $bidEndpoint = "${ordersSvcEndpoint}/api/orders/bid"
 $askEndpoint = "${ordersSvcEndpoint}/api/orders/ask"
 $ordersEndpoint = "${ordersSvcEndpoint}/api/orders"
@@ -20,43 +20,10 @@ function log
 log "orders endpoint: ${ordersSvcEndpoint}"
 log "fulfillment endpoint: ${fulfillmentSvcEndpoint}"
 
-$users = Invoke-RestMethod -Method Get -Uri $usersEndpoint
-if ($users.Count -gt 0)
-{
-    log "found existing users in exchange, if we continue these will be deleted. Do you wish to continue? (y/n)"
-     $continue = Read-Host
-    if ($continue -ne "y" -Or $continue -ne "Y")
-    {
-        log "leaving cluster as is, terminating now"
-        exit
-    }
-    foreach ($user in $users)  
-    {
-        $userId = $user.id
-        Invoke-RestMethod -Method Delete -Uri "$usersEndpoint/$userId"
-    }
-}
-
-$orders = Invoke-RestMethod -Method Get -Uri $ordersEndpoint 
-$startAskCount = $orders.asksCount
-$startBidCount = $orders.bidsCount
-
-if($startAskCount -gt 0 -Or $startBidCount -gt 0)
-{
-    log "found existing orders in exchange, if we continue these will be deleted. Do you wish to continue? (y/n)"
-     $continue = Read-Host
-    if ($continue -ne "y" -Or $continue -ne "Y")
-    {
-        log "leaving cluster as is, terminating now"
-        exit
-    }
-    
-    Invoke-RestMethod -Method Delete -Uri $ordersEndpoint
-}
-
 # Create buyer
 log "creating a new buyer"
 $buyer = @{
+    'ID' = 'buyer'
     'Balance' = 1000000000
     'Quantity' = 100000000
     'Username' = "buyer"
@@ -71,6 +38,7 @@ if ($buyerId -eq "")
 # Create seller
 log "creating a new seller"
 $seller = @{
+    'ID' = 'seller'
     'balance' = 100000000
     'quantity' = 100000000
     'username' = "seller"
@@ -83,17 +51,24 @@ if ($sellerId -eq "")
 }
 
 log "begin adding orders"
-$runCount = 50
+
+$options = "bitcoin", "dogcoin", "lawrencecoin", "jonicoin", "anderscoin"
+$runCount = 5000
 for ($i = 0; $i -lt $runCount; $i++)
 {
+    $random = Get-Random -Minimum 0 -Maximum 4
+    $headers = @{}
+    $coin = $options[$random]
+    Write-Host "Using coin: $coin"
+    $headers.Add("x-item-type",$coin)
     # Create bid
     log "creating a new bid for buyer ${buyerId}"
     $bid = @{
         'value' = 1
         'quantity' = 1
         'userId' = $buyerId
-    } | ConvertTo-Json
-    $bidId = Invoke-RestMethod -Method Post -Uri $bidEndpoint -Body $bid -ContentType "application/json" 
+        }| ConvertTo-Json
+    $bidId = Invoke-RestMethod -Method Post -Uri $bidEndpoint -Body $bid -Headers $headers -ContentType "application/json"
     if ($bidId -eq "")
     {
         log "failed to create bid for buyer ${buyerId}, terminating now"
@@ -107,7 +82,7 @@ for ($i = 0; $i -lt $runCount; $i++)
         'quantity' = 1
         'userId' = $sellerId
     } | ConvertTo-Json
-    $askId = Invoke-RestMethod -Method Post -Uri $askEndpoint -Body $ask -ContentType "application/json" 
+    $askId = Invoke-RestMethod -Method Post -Uri $askEndpoint -Body $ask -ContentType "application/json" -Headers $headers
     if ($askId -eq "")
     {
         log "failed to create new ask for seller ${sellerId}, terminating now"
