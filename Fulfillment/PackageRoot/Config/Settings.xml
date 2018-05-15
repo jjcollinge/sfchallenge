@@ -3,5 +3,7 @@
   <Section Name="ClusterConfig">
     <Parameter Name="ReverseProxy_Port" Value="[ReverseProxy_Port]"/>
     <Parameter Name="MaxTradesPending" Value=""/>
+    <Parameter Name="Metrics_AppInsights_InstrumentationKey" MustOverride="true" Value="" />
+    <Parameter Name="TeamName" MustOverride="true" Value="" />
   </Section>
 </Settings>

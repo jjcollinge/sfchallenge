@@ -7,5 +7,7 @@
   <Section Name="OrderBookConfig">
     <Parameter Name="MaxBidsPending" Value="" />
     <Parameter Name="MaxAsksPending" Value="" />
+    <Parameter Name="Metrics_AppInsights_InstrumentationKey" MustOverride="true" Value="" />
+    <Parameter Name="TeamName" MustOverride="true" Value="" />
   </Section>
 </Settings>

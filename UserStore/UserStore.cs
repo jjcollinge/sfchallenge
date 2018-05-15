@@ -19,13 +19,29 @@ namespace UserStore
     public sealed class UserStore : StatefulService, IUserStore
     {
         public const string StateManagerKey = "UserStore";
+        private Metrics MetricsLog;
 
         public UserStore(StatefulServiceContext context)
             : base(context)
-        { }
+        {
+            Init();
+        }
         public UserStore(StatefulServiceContext context, IReliableStateManagerReplica2 reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
-        { }
+        {
+            Init();
+        }
+
+        private void Init()
+        {
+            // Get configuration from our PackageRoot/Config/Setting.xml file
+            var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
+
+            // Metrics used to compare team performance and reliability against each other
+            var metricsInstrumentationKey = configurationPackage.Settings.Sections["UserStoreConfig"].Parameters["Metrics_AppInsights_InstrumentationKey"].Value;
+            var teamName = configurationPackage.Settings.Sections["UserStoreConfig"].Parameters["TeamName"].Value;
+            this.MetricsLog = new Metrics(metricsInstrumentationKey, teamName);
+        }
 
         /// <summary>
         /// Standard implementation for service endpoints using the V2 Remoting stack. See more: https://aka.ms/servicefabricservicecommunication
@@ -104,6 +120,8 @@ namespace UserStore
                 }
                 await users.AddAsync(tx, user.Id, user);
                 await tx.CommitAsync();
+
+                MetricsLog.UserCreated(user);
             }
             return user.Id;
         }
@@ -119,7 +137,7 @@ namespace UserStore
             }
         }
 
-        private static async Task<bool> ExecuteUserUpdate(User user, IReliableDictionary<string, User> users, ITransaction tx)
+        private async Task<bool> ExecuteUserUpdate(User user, IReliableDictionary<string, User> users, ITransaction tx)
         {
             bool result;
             var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
@@ -127,6 +145,8 @@ namespace UserStore
             {
                 result = await users.TryUpdateAsync(tx, user.Id, user, current.Value);
                 await tx.CommitAsync();
+
+                MetricsLog.UserUpdated(user);
             }
             else
             {

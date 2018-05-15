@@ -42,7 +42,7 @@ namespace OrderBook
 
         private static readonly HttpClient client = new HttpClient();
         private string reverseProxyPort;
-
+        private Metrics MetricsLog;
         private int maxPendingAsks;
         private int maxPendingBids;
         private const int backOffDurationInSec = 2;
@@ -72,6 +72,11 @@ namespace OrderBook
 
             maxPendingAsks = int.Parse(configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
             maxPendingBids = int.Parse(configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
+
+            // Metrics used to compare team performance and reliability against each other
+            var metricsInstrumentationKey = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Metrics_AppInsights_InstrumentationKey"].Value;
+            var teamName = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["TeamName"].Value;
+            this.MetricsLog = new Metrics(metricsInstrumentationKey, teamName);
         }
 
         /// <summary>
@@ -93,6 +98,9 @@ namespace OrderBook
             }
 
             await this.asks.AddOrderAsync(order);
+
+            MetricsLog.AskCreated(order);
+
             return order.Id;
         }
 
@@ -116,6 +124,9 @@ namespace OrderBook
             // Changes will fail an audit ^
 
             await this.bids.AddOrderAsync(order);
+
+            MetricsLog.BidCreated(order);
+
             return order.Id;
         }
 
@@ -251,7 +262,8 @@ namespace OrderBook
                     if (IsMatch(maxBid, minAsk))
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"New match: bid {maxBid.Id} and ask {minAsk.Id}");
-
+                        MetricsLog.OrderMatched(maxBid, minAsk);
+                        
                         try
                         {
                             // We split the ask incase the seller had a bigger
