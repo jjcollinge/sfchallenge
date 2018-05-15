@@ -22,6 +22,8 @@ using System.Runtime.Serialization;
 using System.Net.Http.Headers;
 using System.Fabric.Description;
 using System.Net;
+using Microsoft.ApplicationInsights.Extensibility;
+using Microsoft.ApplicationInsights.ServiceFabric;
 
 namespace OrderBook
 {
@@ -458,10 +460,13 @@ namespace OrderBook
                                     .UseKestrel()
                                     .ConfigureServices(
                                         services => services
+                                            .AddSingleton<HttpClient>(new HttpClient())
                                             .AddSingleton<StatefulServiceContext>(serviceContext)
-                                            .AddSingleton<OrderBook>(this))
+                                            .AddSingleton<OrderBook>(this)
+                                            .AddSingleton<ITelemetryInitializer>((serviceProvider) => FabricTelemetryInitializerExtension.CreateFabricTelemetryInitializer(serviceContext)))
                                     .UseContentRoot(Directory.GetCurrentDirectory())
                                     .UseStartup<Startup>()
+                                    .UseApplicationInsights()
                                     .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseReverseProxyIntegration)
                                     .UseUrls(url)
                                     .Build();
