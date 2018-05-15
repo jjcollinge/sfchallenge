@@ -283,7 +283,7 @@ namespace Fulfillment
 
                                 ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} completed");
                                 await tx.CommitAsync();
-                                MetricsLog.Traded(trade);
+                                MetricsLog.Traded(trade, Metrics.TradedStatus.Completed );
                             }
                             else
                             {
@@ -294,6 +294,7 @@ namespace Fulfillment
                                 // this would normally be deadlettered.
                                 ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} aborted");
                                 tx.Abort();
+                                MetricsLog.Traded(trade, Metrics.TradedStatus.Failed );
                             }
                         }
                     }

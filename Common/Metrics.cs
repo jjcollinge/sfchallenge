@@ -21,12 +21,19 @@ namespace Common
         }
 
         #region Fulfillment Metrics
-        public void Traded(Trade trade)
+
+        public enum TradedStatus
+        {
+            Completed = 0,
+            Failed = 2,
+        }
+        public void Traded(Trade trade, TradedStatus status)
         {
             var properties = new Dictionary<string, string>() {
                 { "AskUserId", trade.Ask.UserId },
                 { "BidUserId", trade.Bid.UserId },
                 { "TradeId", trade.Id },
+                { "Status", status.ToString("D") },
             };
             var metrics = new Dictionary<string, double>() {
                 { "Spread", trade.Ask.Value - trade.Bid.Value },
