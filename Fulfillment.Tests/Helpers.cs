@@ -27,6 +27,13 @@ namespace Fulfillment.Tests
             ConfigurationProperty maxTradesPending = CreateConfigurationSectionParameters("MaxTradesPending", "10");
             configSection.Parameters.Add(maxTradesPending);
 
+            ConfigurationProperty appInsightsKey = CreateConfigurationSectionParameters("Metrics_AppInsights_InstrumentationKey", "");
+            configSection.Parameters.Add(appInsightsKey);
+
+            ConfigurationProperty teamName = CreateConfigurationSectionParameters("TeamName", "");
+            configSection.Parameters.Add(teamName);
+
+
             //Build ConfigurationPackage
             ConfigurationPackage configPackage = CreateConfigurationPackage(configSettings);
             var context = new MockCodePackageActivationContext(

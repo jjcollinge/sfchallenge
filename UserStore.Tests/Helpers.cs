@@ -6,7 +6,7 @@ using System.Fabric.Description;
 using System.Text;
 using static ServiceFabric.Mocks.MockConfigurationPackage;
 
-namespace OrderBook.Tests
+namespace UserStore.Tests
 {
     public class Helpers
     {
@@ -18,32 +18,14 @@ namespace OrderBook.Tests
             //Build ConfigurationSettings
             var configSettings = CreateConfigurationSettings(configSections);
 
-            ConfigurationSection orderBookConfig = CreateConfigurationSection("OrderBookConfig");
-            configSections.Add(orderBookConfig);
-
-            ConfigurationProperty maxAsksParam = CreateConfigurationSectionParameters("MaxAsksPending", "200");
-            orderBookConfig.Parameters.Add(maxAsksParam);
-
-            ConfigurationProperty maxBidsPending = CreateConfigurationSectionParameters("MaxBidsPending", "200");
-            orderBookConfig.Parameters.Add(maxBidsPending);
+            ConfigurationSection userStoreConfig = CreateConfigurationSection("UserStoreConfig");
+            configSections.Add(userStoreConfig);
 
             ConfigurationProperty appInsightsKey = CreateConfigurationSectionParameters("Metrics_AppInsights_InstrumentationKey", "");
-            orderBookConfig.Parameters.Add(appInsightsKey);
+            userStoreConfig.Parameters.Add(appInsightsKey);
 
             ConfigurationProperty teamName = CreateConfigurationSectionParameters("TeamName", "");
-            orderBookConfig.Parameters.Add(teamName);
-
-            ConfigurationSection clusterConfig = CreateConfigurationSection("ClusterConfig");
-            configSections.Add(clusterConfig);
-
-            ConfigurationProperty reverseProxyPort = CreateConfigurationSectionParameters("ReverseProxy_Port", "19081");
-            clusterConfig.Parameters.Add(reverseProxyPort);
-
-            //ConfigurationSection configSection2 = CreateConfigurationSection("CosmosDB");
-            //configSections.Add(clusterConfig);
-
-            //ConfigurationProperty cosmosDBConnectionString = CreateConfigurationSectionParameters("ConnectionString", "");
-            //clusterConfig.Parameters.Add(cosmosDBConnectionString);
+            userStoreConfig.Parameters.Add(teamName);
 
             //Build ConfigurationPackage
             ConfigurationPackage configPackage = CreateConfigurationPackage(configSettings);
