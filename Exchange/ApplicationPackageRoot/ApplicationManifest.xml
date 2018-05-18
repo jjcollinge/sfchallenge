@@ -1,6 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ApplicationManifest xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ApplicationTypeName="ExchangeType" ApplicationTypeVersion="1.0.0" xmlns="http://schemas.microsoft.com/2011/01/fabric">
   <Parameters>
+    <!--Metrics used to compare team performance and reliability against each other-->
+    <Parameter Name="Metrics_AppInsights_InstrumentationKey" DefaultValue="" />
+    <Parameter Name="TeamName" DefaultValue="" />
     <!-- Cluster parameters -->
     <Parameter Name="ReverseProxy_Port" DefaultValue="19081" />
     <!-- Logger parameters -->
@@ -69,7 +72,16 @@
   </ServiceManifestImport>
   <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="UserStorePkg" ServiceManifestVersion="1.0.0" />
-    <ConfigOverrides />
+    <ConfigOverrides>
+      <ConfigOverride Name="Config">
+        <Settings>
+          <Section Name="UserStoreConfig">
+            <Parameter Name="Metrics_AppInsights_InstrumentationKey" Value="[Metrics_AppInsights_InstrumentationKey]" />
+            <Parameter Name="TeamName" Value="[TeamName]" />
+          </Section>
+        </Settings>
+      </ConfigOverride>
+    </ConfigOverrides>
     <Policies>
       <RunAsPolicy CodePackageRef="Code" UserRef="LocalAdmin" />
     </Policies>
@@ -82,6 +94,8 @@
           <Section Name="ClusterConfig">
             <Parameter Name="ReverseProxy_Port" Value="[ReverseProxy_Port]" />
             <Parameter Name="MaxTradesPending" Value="[Fulfillment_MaxTradesPending]" />
+            <Parameter Name="Metrics_AppInsights_InstrumentationKey" Value="[Metrics_AppInsights_InstrumentationKey]" />
+            <Parameter Name="TeamName" Value="[TeamName]" />
           </Section>
         </Settings>
       </ConfigOverride>
@@ -103,6 +117,8 @@
           <Section Name="OrderBookConfig">
             <Parameter Name="MaxBidsPending" Value="[OrderBook_MaxBidsPending]" />
             <Parameter Name="MaxAsksPending" Value="[OrderBook_MaxAsksPending]" />
+            <Parameter Name="Metrics_AppInsights_InstrumentationKey" Value="[Metrics_AppInsights_InstrumentationKey]" />
+            <Parameter Name="TeamName" Value="[TeamName]" />
           </Section>
         </Settings>
       </ConfigOverride>

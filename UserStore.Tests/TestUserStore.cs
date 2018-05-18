@@ -12,7 +12,7 @@ namespace UserStore.Tests
         [Fact]
         public async Task StoreUser()
         {
-            var context = MockStatefulServiceContextFactory.Default;
+            var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new UserStore(context, stateManager);
 

@@ -35,6 +35,7 @@ namespace Fulfillment
         private int maxPendingTrades;
         private Random rand = new Random();
         private const int backOffDurationInSec = 2;
+        private Metrics MetricsLog;
 
         public Fulfillment(StatefulServiceContext context)
             : base(context)
@@ -50,6 +51,7 @@ namespace Fulfillment
             Init();
             this.Trades = new TradeQueue(this.StateManager, TradeQueueName);
             this.Users = new UserStoreClient();
+            
         }
 
         private void Init()
@@ -58,6 +60,11 @@ namespace Fulfillment
             var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
             reverseProxyPort = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["ReverseProxy_Port"].Value;
             maxPendingTrades = int.Parse(configurationPackage.Settings.Sections["ClusterConfig"].Parameters["MaxTradesPending"].Value);
+
+            // Metrics used to compare team performance and reliability against each other
+            var metricsInstrumentationKey = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["Metrics_AppInsights_InstrumentationKey"].Value;
+            var teamName = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["TeamName"].Value;
+            this.MetricsLog = new Metrics(metricsInstrumentationKey, teamName);
         }
 
         /// <summary>
@@ -276,6 +283,7 @@ namespace Fulfillment
 
                                 ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} completed");
                                 await tx.CommitAsync();
+                                MetricsLog.Traded(trade, Metrics.TradedStatus.Completed );
                             }
                             else
                             {
@@ -286,6 +294,7 @@ namespace Fulfillment
                                 // this would normally be deadlettered.
                                 ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} aborted");
                                 tx.Abort();
+                                MetricsLog.Traded(trade, Metrics.TradedStatus.Failed );
                             }
                         }
                     }
