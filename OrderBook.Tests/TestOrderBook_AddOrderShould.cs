@@ -23,7 +23,7 @@ namespace OrderBook.Tests
             var context = Helpers.GetMockContext();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order("user1", 100, 30, "buyer");
+            var ask = new Order("user1", "buyer", CurrencyPair.GBPUSD, 100, 30);
 
             try
             {
@@ -50,9 +50,9 @@ namespace OrderBook.Tests
             {
                 try
                 {
-                    for (int i = 0; i < 300; i++)
+                    for (int i = 0; i < 1000; i++)
                     {
-                        var ask = new Order(Guid.NewGuid().ToString(), 100, 30, "buyer");
+                        var ask = new Order("buyer", CurrencyPair.GBPUSD, 100, 30);
                         await service.AddAskAsync(ask);
                     }
 
@@ -71,29 +71,29 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order("", 100, 30, string.Empty);
+            var ask = new Order("", CurrencyPair.GBPUSD, 100, 30);
             await Assert.ThrowsAsync<InvalidOrderException>(() => service.AddAskAsync(ask));
         }
 
         [Fact]
-        public async Task ThrowIfZeroQuantityOrder()
+        public async Task ThrowIfZeroAmountOrder()
         {
             var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order("user1", 0, 30, string.Empty);
+            var ask = new Order("user1", CurrencyPair.GBPUSD, 0, 30);
             await Assert.ThrowsAsync<InvalidOrderException>(() => service.AddAskAsync(ask));
         }
 
         [Fact]
-        public async Task ThrowIfZeroValueOrder()
+        public async Task ThrowIfZeroPriceOrder()
         {
             var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order("user1", 30, 0, string.Empty);
+            var ask = new Order("user1", CurrencyPair.GBPUSD, 30, 0);
             await Assert.ThrowsAsync<InvalidOrderException>(() => service.AddAskAsync(ask));
         }
 

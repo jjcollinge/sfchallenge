@@ -36,8 +36,8 @@ namespace Common
                 { "Status", status.ToString("D") },
             };
             var metrics = new Dictionary<string, double>() {
-                { "Spread", trade.Ask.Value - trade.Bid.Value },
-                { "Volume", trade.Bid.Quantity },
+                { "Spread", trade.Ask.Price - trade.Bid.Price },
+                { "Volume", trade.Bid.Amount },
             };
             _tc.TrackEvent("Trade completed", properties, metrics);
         }
@@ -48,8 +48,8 @@ namespace Common
         {
             var properties = new Dictionary<string, string>() { { "userId", order.UserId } };
             var metrics = new Dictionary<string, double>() {
-                { "Quantity", order.Quantity },
-                { "Value", order.Value },
+                { "Amount", order.Amount },
+                { "Price", order.Price },
             };
             _tc.TrackEvent("Bid added", properties, metrics);
         }
@@ -58,8 +58,8 @@ namespace Common
         {
             var properties = new Dictionary<string, string>() { { "userId", order.UserId } };
             var metrics = new Dictionary<string, double>() {
-                { "Quantity", order.Quantity },
-                { "Value", order.Value },
+                { "Amount", order.Amount },
+                { "Price", order.Price },
             };
             _tc.TrackEvent("Ask added", properties, metrics);
         }
@@ -71,10 +71,10 @@ namespace Common
                 { "AskUserId", ask.UserId }
             };
             var metrics = new Dictionary<string, double>() {
-                { "BidQuantity", bid.Quantity },
-                { "BidValue", bid.Value },
-                { "AskQuantity", ask.Quantity },
-                { "AskValue", ask.Value },
+                { "BidAmount", bid.Amount },
+                { "BidPrice", bid.Price },
+                { "AskAmount", ask.Amount },
+                { "AskPrice", ask.Price },
             };
             _tc.TrackEvent("New order match", properties, metrics);
         }

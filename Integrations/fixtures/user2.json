@@ -1,0 +1,8 @@
+{
+	"id": "user2",
+	"username": "user2",
+	"currencyAmounts": {
+		"GBP": 1000000000000,
+		"USD": 0
+	}
+}

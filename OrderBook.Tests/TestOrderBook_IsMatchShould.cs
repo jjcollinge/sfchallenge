@@ -9,8 +9,8 @@ namespace OrderBook.Tests
     {
         public void ReturnTrueWhenValueOverlapsAndQuantityIsSufficient()
         {
-            var ask = new Order(100, 200, string.Empty);
-            var bid = new Order(50, 220, string.Empty);
+            var ask = new Order(CurrencyPair.GBPUSD, 100, 200);
+            var bid = new Order(CurrencyPair.GBPUSD, 50, 220);
         }
     }
 }

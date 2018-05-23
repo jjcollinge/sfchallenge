@@ -12,6 +12,8 @@ namespace Common
 
         public Order Bid { get; set; }
 
+        public Order Settlement { get; set; }
+
         public static implicit operator Trade(TradeRequestModel request)
         {
             if (request == null)
@@ -19,7 +21,7 @@ namespace Common
                 return null;
             }
             var id = request.Ask.Id + "_" + request.Bid.Id;
-            return new Trade(id, request.Ask, request.Bid);
+            return new Trade(id, request.Ask, request.Bid, request.Settlement);
         }
     }
 }

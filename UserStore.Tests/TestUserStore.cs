@@ -16,7 +16,10 @@ namespace UserStore.Tests
             var stateManager = new MockReliableStateManager();
             var service = new UserStore(context, stateManager);
 
-            var sutUser = new User("42", "Anders", 42, 128, new List<string>()
+
+            var currencyAmounts = new Dictionary<string, double>();
+            currencyAmounts.Add(CurrencyPair.GBPUSD.GetBuyerWantCurrency(), 21);
+            var sutUser = new User("42", "Anders", currencyAmounts, new List<string>()
                 {
                     "t1"
                 });

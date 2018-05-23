@@ -189,7 +189,7 @@ namespace OrderBook
             {
                 return false;
             }
-            return (bid.Value >= ask.Value) && (bid.Quantity <= ask.Quantity);
+            return (bid.Pair == ask.Pair) && (bid.Price >= ask.Price) && (bid.Amount <= ask.Amount);
         }
 
         /// <summary>
@@ -200,25 +200,24 @@ namespace OrderBook
         /// <param name="bid"></param>
         /// <param name="ask"></param>
         /// <returns></returns>
-        public (Order, Order) SplitAsk(Order bid, Order ask)
+        public (Order, Order) SettleTrade(Order bid, Order ask)
         {
-            if (ask.Quantity == 0 || ask.Value == 0)
+            if (ask.Price == 0 || ask.Amount == 0)
             {
                 throw new InvalidAskException("Ask quantity or value cannot be 0");
             }
-            if (bid.Quantity == 0 || bid.Value == 0)
+            if (bid.Price == 0 || bid.Amount == 0)
             {
                 throw new InvalidBidException("Bid quantity or value cannot be 0");
             }
-            Order leftOverOrder = null;
-            if (ask.Quantity != bid.Quantity)
+            Order leftOverAsk = null;
+            if (ask.Amount != bid.Amount)
             {
-                var leftOverQuantity = (ask.Quantity - bid.Quantity);
-                var leftOverValue = ask.Value;
-                leftOverOrder = new Order(leftOverValue, leftOverQuantity, ask.UserId);
+                var amountRemaining = (ask.Amount - bid.Amount);
+                leftOverAsk = new Order(ask.UserId, ask.Pair, amountRemaining, ask.Price);
             }
-            var matchOrder = new Order(ask.Id, bid.Value, bid.Quantity, ask.UserId);
-            return (matchOrder, leftOverOrder);
+            var settlement = new Order(ask.Id, ask.UserId, bid.Pair, bid.Amount, bid.Price);
+            return (settlement, leftOverAsk);
         }
 
         /// <summary>
@@ -240,7 +239,7 @@ namespace OrderBook
 
             Order maxBid = null;
             Order minAsk = null;
-            Order match = null;
+            Order settlement = null;
 
             while (true)
             {
@@ -270,7 +269,7 @@ namespace OrderBook
                             // quantity of goods than the buyer wished to bid for.
                             // The cost per unit is kept consistent between the
                             // original ask and any left over asks.
-                            (var matchingAsk, var leftOverAsk) = SplitAsk(maxBid, minAsk);
+                            (var settledOrder, var leftOverAsk) = SettleTrade(maxBid, minAsk);
                             if (leftOverAsk != null)
                             {
                                 try
@@ -295,7 +294,7 @@ namespace OrderBook
                                     continue;
                                 }
                             }
-                            match = matchingAsk;
+                            settlement = settledOrder;
                         }
                         catch (InvalidAskException)
                         {
@@ -317,8 +316,9 @@ namespace OrderBook
 
                         var trade = new TradeRequestModel
                         {
-                            Ask = match,
+                            Ask = minAsk,
                             Bid = maxBid,
+                            Settlement = settlement,
                         };
 
                         // Send the trade request to our fulfillment service to complete.

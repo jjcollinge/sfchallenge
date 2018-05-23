@@ -13,8 +13,6 @@ namespace Fulfillment.Controllers
     public class TradesController : Controller
     {
         private Fulfillment fulfillment;
-        // Not thread safe as worst case is cooldown lasting slightly longer than required
-        private static bool IsCoolingDown = false;
 
         public TradesController(Fulfillment fulfillment)
         {
@@ -25,11 +23,6 @@ namespace Fulfillment.Controllers
         [HttpPost]
         public async Task<IActionResult> PostAsync([FromBody] TradeRequestModel tradeRequest)
         {
-            if (IsCoolingDown)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(1));
-                return new StatusCodeResult(429);
-            }
             try
             {
                 var tradeId = await this.fulfillment.AddTradeAsync(tradeRequest);
@@ -45,20 +38,6 @@ namespace Fulfillment.Controllers
             }
             catch (MaxPendingTradesExceededException)
             {
-                if (!IsCoolingDown)
-                {
-                    try
-                    {
-                        ServiceEventSource.Current.Message("Max pending transactions limit reached, cooling down");
-
-                        IsCoolingDown = true;
-                        await Task.Delay(TimeSpan.FromSeconds(3));
-                    }
-                    finally
-                    {
-                        IsCoolingDown = false;
-                    }
-                }
                 return new StatusCodeResult(429);
             }
             catch (FabricException)

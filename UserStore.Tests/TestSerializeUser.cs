@@ -12,7 +12,9 @@ namespace UserStore.Tests
         [Fact]
         public void Serialize_Deserialize()
         {
-            var user = new User("42", "Anders", 42, 128, new List<string>()
+            var currencyAmounts = new Dictionary<string, double>();
+            currencyAmounts.Add(CurrencyPair.GBPUSD.GetBuyerWantCurrency(), 100);
+            var user = new User("42", "Anders", currencyAmounts, new List<string>()
                 {
                     "t1"
                 });
@@ -28,19 +30,24 @@ namespace UserStore.Tests
             }
 
             Assert.Equal(user.Username, userDeserialized.Username);
-            Assert.Equal(user.TradeIds.Count(), userDeserialized.TradeIds.Count());
+            Assert.Equal(user.LatestTrades.Count(), userDeserialized.LatestTrades.Count());
         }
 
         [Fact]
         public void Serialize_Deserialize_List()
         {
+            var currencyAmounts = new Dictionary<string, double>();
+            currencyAmounts.Add(CurrencyPair.GBPUSD.GetBuyerWantCurrency(), 21);
+
+            var currencyAmounts1 = new Dictionary<string, double>();
+            currencyAmounts1.Add(CurrencyPair.GBPUSD.GetBuyerWantCurrency(), 455);
             var users = new List<User>()
             {
-                new User("42", "Anders", 42, 128, new List<string>()
+                new User("42", "Anders", currencyAmounts, new List<string>()
                 {
                     "t1"
                 }),
-                new User("43", "Joni", 21, 455, null),
+                new User("43", "Joni", currencyAmounts1, null),
             };
 
             var serializer = new DataContractSerializer(typeof(IEnumerable<User>));

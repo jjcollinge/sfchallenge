@@ -190,18 +190,20 @@ namespace Fulfillment
             try
             {
                 var newBuyer = buyer.AddTrade(trade.Id);
+                newBuyer.UpdateCurrencyAmount(trade.Settlement.Pair.GetBuyerWantCurrency(), trade.Settlement.Amount);
+                newBuyer.UpdateCurrencyAmount(trade.Settlement.Pair.GetSellerWantCurrency(), (trade.Settlement.Amount * trade.Settlement.Price) * -1.0);
                 newBuyer = new User(newBuyer.Id,
                                 newBuyer.Username,
-                                newBuyer.Quantity + trade.Bid.Quantity,
-                                newBuyer.Balance - (trade.Bid.Value * trade.Bid.Quantity),
-                                newBuyer.TradeIds);
+                                newBuyer.CurrencyAmounts,
+                                newBuyer.LatestTrades);
 
                 var newSeller = seller.AddTrade(trade.Id);
+                newSeller.UpdateCurrencyAmount(trade.Settlement.Pair.GetBuyerWantCurrency(), trade.Settlement.Amount * -1.0);
+                newSeller.UpdateCurrencyAmount(trade.Settlement.Pair.GetSellerWantCurrency(), (trade.Settlement.Amount * trade.Settlement.Price));
                 newSeller = new User(newSeller.Id,
                                     newSeller.Username,
-                                    newSeller.Quantity - trade.Bid.Quantity,
-                                    newSeller.Balance + (trade.Bid.Value * trade.Bid.Quantity),
-                                    newSeller.TradeIds);
+                                    newSeller.CurrencyAmounts,
+                                    newSeller.LatestTrades);
 
                 var buyerUpdated = await Users.UpdateUserAsync(newBuyer);
                 var sellerUpdated = await Users.UpdateUserAsync(newSeller);

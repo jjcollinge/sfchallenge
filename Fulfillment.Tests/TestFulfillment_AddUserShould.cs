@@ -14,13 +14,10 @@ namespace Fulfillment.Tests
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
 
-            var qty = (uint)100;
-            var balance = (uint)100;
             var username = "  ";
             var request = new UserRequestModel
             {
-                Quantity = qty,
-                Balance = balance,
+                CurrencyAmounts = null,
                 Username = username,
             };
 

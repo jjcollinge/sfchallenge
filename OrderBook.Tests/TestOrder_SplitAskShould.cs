@@ -17,15 +17,17 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var askQuantity = 100;
-            var askValue = 100;
-            var ask = new Order("user1", askValue, askQuantity, string.Empty);
-            var bid = new Order("user2", askValue + 10, askQuantity/2, string.Empty);
-            (var match, var leftOver) = service.SplitAsk(bid, ask);
-            Assert.True(match.Value == bid.Value);
-            Assert.True(match.Quantity == bid.Quantity);
-            Assert.True(leftOver.Quantity == (ask.Quantity - bid.Quantity));
-            Assert.True(leftOver.Value == ask.Value);
+            var askAmount = 100;
+            var askPrice = 100;
+            var ask = new Order("user1", CurrencyPair.GBPUSD, (uint)askAmount, askPrice);
+            var bid = new Order("user2", CurrencyPair.GBPUSD, (uint)askAmount/2, askPrice + 10);
+            (var match, var leftOver) = service.SettleTrade(bid, ask);
+            Assert.NotNull(match);
+            Assert.NotNull(leftOver);
+            Assert.True(match.Price == bid.Price);
+            Assert.True(match.Amount == bid.Amount);
+            Assert.True(leftOver.Amount == (ask.Amount - bid.Amount));
+            Assert.True(leftOver.Price == ask.Price);
         }
 
         [Fact]
@@ -35,14 +37,14 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var askQuantity = 100;
-            var askValue = 100;
-            var ask = new Order("user1", askValue, askQuantity, string.Empty);
-            var bid = new Order("user2", 100, 150, string.Empty);
+            var askAmount = 100;
+            var askPrice = 100;
+            var ask = new Order("user1", CurrencyPair.GBPUSD, (uint)askAmount, askPrice);
+            var bid = new Order("user2", CurrencyPair.GBPUSD, 100, 150);
 
-            var spread = bid.Value - askValue;
-            (var match, var leftOver) = service.SplitAsk(bid, ask);
-            Assert.Equal(askValue + spread, match.Value);
+            var spread = bid.Price - askPrice;
+            (var match, var leftOver) = service.SettleTrade(bid, ask);
+            Assert.Equal(askPrice + spread, match.Price);
         }
 
         [Fact]
@@ -52,37 +54,37 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order("user1", 100, 100, string.Empty);
-            var bid = new Order("user2", 100, 100, string.Empty);
+            var ask = new Order("user1", CurrencyPair.GBPUSD, 100,100);
+            var bid = new Order("user2", CurrencyPair.GBPUSD, 100,100);
 
-            var spread = bid.Value - ask.Value;
-            (var match, var leftOver) = service.SplitAsk(bid, ask);
+            var spread = bid.Price - ask.Price;
+            (var match, var leftOver) = service.SettleTrade(bid, ask);
             Assert.Null(leftOver);
             Assert.NotNull(match);
         }
 
         [Fact]
-        public void ThrowIfValueIsZero()
+        public void ThrowIfPriceIsZero()
         {
             var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order("user1", 100, 100, string.Empty);
-            var bid = new Order("user2", 100, 0, string.Empty);
-            Assert.Throws<InvalidBidException>(() => service.SplitAsk(bid, ask));
+            var ask = new Order("user1", CurrencyPair.GBPUSD, 100, 100);
+            var bid = new Order("user2", CurrencyPair.GBPUSD, 100, 0);
+            Assert.Throws<InvalidBidException>(() => service.SettleTrade(bid, ask));
         }
 
         [Fact]
-        public void ThrowIfQuantityIsZero()
+        public void ThrowIfAmountIsZero()
         {
             var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new OrderBook(context, stateManager);
 
-            var ask = new Order("user1", 100, 0, string.Empty);
-            var bid = new Order("user2", 100, 100, string.Empty);
-            Assert.Throws<InvalidAskException>(() => service.SplitAsk(bid, ask));
+            var ask = new Order("user1", CurrencyPair.GBPUSD, 100, 0);
+            var bid = new Order("user2", CurrencyPair.GBPUSD, 100, 100);
+            Assert.Throws<InvalidAskException>(() => service.SettleTrade(bid, ask));
         }
     }
 }

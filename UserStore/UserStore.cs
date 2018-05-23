@@ -112,11 +112,10 @@ namespace UserStore
 
             using (var tx = this.StateManager.CreateTransaction())
             {
-                var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
+                var current = await users.TryGetValueAsync(tx, user.Id);
                 if (current.HasValue)
                 {
-                    await ExecuteUserUpdate(user, users, tx);
-                    return user.Id;
+                    return user.Id; // Return existing user
                 }
                 await users.AddAsync(tx, user.Id, user);
                 await tx.CommitAsync();

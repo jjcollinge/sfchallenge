@@ -8,18 +8,19 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Common;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 
 namespace Gateway
 {
     public class Startup
     {
         private const string ForwarderForHeader = "X-Forwarded-Host";
-        private const string ItemTypeHeader = "x-item-type";
         public static HttpClient Client = new HttpClient();
 
         public void ConfigureServices(IServiceCollection services)
@@ -53,6 +54,11 @@ namespace Gateway
                 {
                     PartitionScheme partitioningScheme = await GetOrderBookParititoiningScheme();
 
+                    var bodyStream = new StreamReader(context.Request.Body);
+                    bodyStream.BaseStream.Seek(0, SeekOrigin.Begin);
+                    var bodyText = bodyStream.ReadToEnd();
+                    var order = JsonConvert.DeserializeObject<Order>(bodyText);
+                    
                     if (partitioningScheme == PartitionScheme.Singleton)
                     {
                         //Handle bid and ask requests without parition
@@ -64,7 +70,8 @@ namespace Gateway
                     // If requests have a header of 'x-item-type' then redirect them to the correct partition 
                     // using the 'Named' partition scheme in Service Fabric and it's Reverse proxy.
                     // https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-reverseproxy
-                    var itemTypeExists = context.Request.Headers.TryGetValue(ItemTypeHeader, out var itemType);
+                    var itemTypeExists = true;
+                    var itemType = "";
                     if (partitioningScheme == PartitionScheme.Named && itemTypeExists)
                     {
                         //Handle bid and ask requests with parition

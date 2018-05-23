@@ -20,7 +20,7 @@
                                     AzureActiveDirectory="true"
                                     ServerCertThumbprint="0123456789012345678901234567890123456789" />
   -->
-  <ClusterConnectionParameters ConnectionEndpoint="dotjson.westeurope.cloudapp.azure.com:19000" X509Credential="true" ServerCertThumbprint="D6426E96E0169B60ED030E53FCD05EAC12AAA1E0" FindType="FindByThumbprint" FindValue="D6426E96E0169B60ED030E53FCD05EAC12AAA1E0" StoreLocation="CurrentUser" StoreName="My" />
+  <ClusterConnectionParameters ConnectionEndpoint="dotjsontest.westeurope.cloudapp.azure.com:19000" X509Credential="true" ServerCertThumbprint="3C7B1953A836AF49AB111DFAA1A0B7BFBD5CDC54" FindType="FindByThumbprint" FindValue="3C7B1953A836AF49AB111DFAA1A0B7BFBD5CDC54" StoreLocation="CurrentUser" StoreName="My" />
   <ApplicationParameterFile Path="..\ApplicationParameters\Cloud.xml" />
   <CopyPackageParameters CompressPackage="true" />
 </PublishProfile>

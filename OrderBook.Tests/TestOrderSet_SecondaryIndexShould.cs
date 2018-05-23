@@ -17,10 +17,10 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var orderSet = new OrderSet(stateManager, "test");
 
-            var order1 = new Order(10, 10, string.Empty);
-            var order2 = new Order(12, 5, string.Empty);
-            var order3 = new Order(5, 10, string.Empty);
-
+            var order1 = new Order(CurrencyPair.GBPUSD, 10, 10);
+            var order2 = new Order(CurrencyPair.GBPUSD, 9, 15);
+            var order3 = new Order(CurrencyPair.GBPUSD, 5, 10);
+           
             orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order1);
             orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order2);
             orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order3);
@@ -36,9 +36,9 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var orderSet = new OrderSet(stateManager, "test");
 
-            var order1 = new Order(10, 10, string.Empty);
-            var order2 = new Order(10, 10, string.Empty);
-            var order3 = new Order(10, 10, string.Empty);
+            var order1 = new Order(CurrencyPair.GBPUSD, 10, 10);
+            var order2 = new Order(CurrencyPair.GBPUSD, 10, 10);
+            var order3 = new Order(CurrencyPair.GBPUSD, 10, 10);
 
             orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order1);
             orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order2);
@@ -55,9 +55,9 @@ namespace OrderBook.Tests
             var stateManager = new MockReliableStateManager();
             var orderSet = new OrderSet(stateManager, "test");
 
-            var order1 = new Order(10, 10, string.Empty);
-            var order2 = new Order(12, 5, string.Empty);
-            var order3 = new Order(5, 10, string.Empty);
+            var order1 = new Order(CurrencyPair.GBPUSD, 10, 10);
+            var order2 = new Order(CurrencyPair.GBPUSD, 12, 5);
+            var order3 = new Order(CurrencyPair.GBPUSD, 5, 10);
 
             orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order1);
             orderSet.SecondaryIndex = orderSet.SecondaryIndex.Add(order2);
