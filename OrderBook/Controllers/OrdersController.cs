@@ -108,7 +108,7 @@ namespace OrderBook.Controllers
                 var orderId = await this.orderBook.AddBidAsync(order);
                 return this.Ok(orderId);
             }
-            catch (InvalidAskException ex)
+            catch (InvalidBidException ex)
             {
                 ServiceEventSource.Current.ServiceException(orderBook.Context, "Invalid ask", ex);
                 return new ContentResult { StatusCode = 400, Content = ex.Message };

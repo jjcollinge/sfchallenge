@@ -40,7 +40,7 @@ function createUserFromFixture($fixturePath)
     return $userId
 }
 
-function createAskForUserFromFixture($index, $fixturePath, $userId)
+function createAskForUserFromFixture($index, $userId)
 {
     $fixturePath = "${orderFixturePrefix}.${index}.${orderFixtureSuffix}"
     $order = (Get-Content $fixturePath | Out-String | ConvertFrom-Json)
@@ -51,7 +51,7 @@ function createAskForUserFromFixture($index, $fixturePath, $userId)
     return $askOrderId
 }
 
-function createBidForUserFromFixture($index, $fixturePath, $userId)
+function createBidForUserFromFixture($index, $userId)
 {
     $fixturePath = "${orderFixturePrefix}.${index}.${orderFixtureSuffix}"
     $order = (Get-Content $fixturePath | Out-String | ConvertFrom-Json)
@@ -102,8 +102,8 @@ for ($i = 0; $i -lt $n; $i++)
             5 { $EURUSDCount++ }
         }
     }
-    $bidId = createBidForUserFromFixture $index $orderFixture $user1Id
-    $askId = createAskForUserFromFixture $index $orderFixture $user2Id
+    $bidId = createBidForUserFromFixture $index $user1Id
+    $askId = createAskForUserFromFixture $index $user2Id
 }
 
 $status = "successfully"
