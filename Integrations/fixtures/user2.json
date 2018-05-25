@@ -3,6 +3,7 @@
 	"username": "user2",
 	"currencyAmounts": {
 		"GBP": 1000000000000,
-		"USD": 0
+		"USD": 1000000000000,
+		"EUR": 1000000000000
 	}
 }

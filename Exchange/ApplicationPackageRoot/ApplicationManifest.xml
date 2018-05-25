@@ -155,7 +155,14 @@
     <!-- Create OrderBook Service -->
     <Service Name="OrderBook" ServiceDnsName="orderbook.exchange">
       <StatefulService ServiceTypeName="OrderBookType" TargetReplicaSetSize="[OrderBook_TargetReplicaSetSize]" MinReplicaSetSize="[OrderBook_MinReplicaSetSize]">
-        <SingletonPartition />
+        <NamedPartition>
+          <Partition Name="GBP-USD" />
+          <Partition Name="GBP-EUR" />
+          <Partition Name="USD-GBP" />
+          <Partition Name="USD-EUR" />
+          <Partition Name="EUR-GBP" />
+          <Partition Name="EUR-USD" />
+        </NamedPartition>
       </StatefulService>
     </Service>
     <!-- Create Logger Service -->

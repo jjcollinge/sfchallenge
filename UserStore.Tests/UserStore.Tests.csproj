@@ -18,4 +18,8 @@
     <ProjectReference Include="..\UserStore\UserStore.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Update="Microsoft.NETCore.App" Version="2.0.6" />
+  </ItemGroup>
+
 </Project>

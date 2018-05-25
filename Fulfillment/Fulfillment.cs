@@ -45,6 +45,7 @@ namespace Fulfillment
             this.Users = new UserStoreClient();
         }
 
+        // This constructor is used during unit testing by setting a mock IReliableStateManagerReplica
         public Fulfillment(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
@@ -54,6 +55,9 @@ namespace Fulfillment
             
         }
 
+        /// <summary>
+        /// Init setups in any configuration values
+        /// </summary>
         private void Init()
         {
             // Get configuration from our PackageRoot/Config/Setting.xml file
@@ -280,7 +284,6 @@ namespace Fulfillment
                                 // successfully updated and the trade has been logged.
                                 // We can now commit the transaction to release our lock
                                 // on the queue.
-
                                 await LogAsync(trade);  // Log trade to an external persistence store
 
                                 ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} completed");
@@ -331,7 +334,7 @@ namespace Fulfillment
                     }
                     catch(TimeoutException)
                     {
-                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Operation timedout, aborting and will retry");
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Operation timed out, aborting and will retry");
 
                         tx.Abort();
                         await BackOff(cancellationToken);
@@ -341,6 +344,11 @@ namespace Fulfillment
             }
         }
 
+        /// <summary>
+        /// BackOff will delay execution for n seconds
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         private static async Task BackOff(CancellationToken cancellationToken)
         {
             ServiceEventSource.Current.Message($"Fulfillment is backing off for {backOffDurationInSec} seconds");

@@ -43,6 +43,9 @@ namespace Logger
             Init();
         }
 
+        /// <summary>
+        /// Init setups in any configuration values
+        /// </summary>
         private void Init()
         {
             ConfigurationPackage configPackage = this.Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
@@ -51,6 +54,11 @@ namespace Logger
             tradeLogger = MongoDBTradeLogger.Create(connectionString, enableSsl, databaseName, collectionName);
         }
 
+        /// <summary>
+        /// Adds a trade to the trade log
+        /// </summary>
+        /// <param name="trade"></param>
+        /// <returns></returns>
         public async Task LogAsync(Trade trade)
         {
             IReliableConcurrentQueue<Trade> exportQueue =
@@ -58,35 +66,8 @@ namespace Logger
 
             using (var tx = this.StateManager.CreateTransaction())
             {
-                // Add trade to log queue
-                //logReceivedEvent.Set();
                 await exportQueue.EnqueueAsync(tx, trade);
                 await tx.CommitAsync();
-            }
-        }
-
-        public async Task ClearAsync()
-        {
-            IReliableConcurrentQueue<Trade> exportQueue =
-             await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
-
-            using (var tx = this.StateManager.CreateTransaction())
-            {
-                // Clear the external log trade store
-                await tradeLogger.ClearAsync(CancellationToken.None);
-
-                // Clear the queue
-                var t = Task.Run(async () =>
-                {
-                    while (exportQueue.Count > 0)
-                    {
-                        await exportQueue.TryDequeueAsync(tx);
-                    }
-                    await tx.CommitAsync();
-                    return true;
-                });
-                var timeout = Task.Delay(TimeSpan.FromSeconds(30));
-                await Task.WhenAny(t, timeout);
             }
         }
 
@@ -141,7 +122,7 @@ namespace Logger
                         // Logger may have lost connection
                         // Back off and retry connection
                         await BackOff(cancellationToken);
-                        Init();
+                        Init(); // reinitialize connection
                         continue;
                     }
                     catch (FabricNotPrimaryException)
@@ -170,6 +151,11 @@ namespace Logger
             }
         }
 
+        /// <summary>
+        /// BackOff will delay execution for n seconds
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         private static async Task BackOff(CancellationToken cancellationToken)
         {
             ServiceEventSource.Current.Message($"Logger is backing off for {backOffDurationInSec} seconds");
