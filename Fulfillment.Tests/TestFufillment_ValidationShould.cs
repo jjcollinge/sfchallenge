@@ -57,7 +57,7 @@ namespace Fulfillment.Tests
             buyerCurrencyAmounts.Add(CurrencyPair.GBPUSD.GetSellerWantCurrency(), 100);
             var buyer = new User(buyerId, "buyer", buyerCurrencyAmounts, new List<string>() { trade.Id });
 
-            Assert.Throws<BadBuyerException>(() => Validation.ThrowIfNotValidTrade(tradeRequest, seller, buyer));
+            Assert.Throws<DuplicateBidException>(() => Validation.ThrowIfNotValidTrade(tradeRequest, seller, buyer));
         }
 
         [Fact]

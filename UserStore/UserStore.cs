@@ -153,7 +153,7 @@ namespace UserStore
                 await users.AddAsync(tx, user.Id, user);
                 await tx.CommitAsync();
 
-                MetricsLog.UserCreated(user);
+                MetricsLog?.UserCreated(user);
             }
             return user.Id;
         }
@@ -205,7 +205,7 @@ namespace UserStore
                     result = await users.TryUpdateAsync(tx, user.Id, user, current.Value);
                     await tx.CommitAsync();
 
-                    MetricsLog.UserUpdated(user);
+                    MetricsLog?.UserUpdated(user);
                 }
                 else
                 {

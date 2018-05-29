@@ -49,10 +49,8 @@ namespace Fulfillment
         public Fulfillment(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
-            Init();
             this.Trades = new TradeQueue(this.StateManager, TradeQueueName);
             this.Users = new UserStoreClient();
-
         }
 
         /// <summary>
@@ -338,7 +336,7 @@ namespace Fulfillment
                                 ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} completed");
                                 await tx.CommitAsync();
 
-                                MetricsLog.Traded(trade, Metrics.TradedStatus.Completed);  // Record trade success
+                                MetricsLog?.Traded(trade, Metrics.TradedStatus.Completed);  // Record trade success
                             }
                             else
                             {
@@ -350,7 +348,7 @@ namespace Fulfillment
                                 ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} aborted");
                                 tx.Abort();
 
-                                MetricsLog.Traded(trade, Metrics.TradedStatus.Failed); // Record trade failed
+                                MetricsLog?.Traded(trade, Metrics.TradedStatus.Failed); // Record trade failed
                             }
                         }
                     }

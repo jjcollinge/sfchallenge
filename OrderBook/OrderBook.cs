@@ -61,7 +61,6 @@ namespace OrderBook
         public OrderBook(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
-            Init(context);
             this.asks = new OrderSet(reliableStateManagerReplica, AskBookName);
             this.bids = new OrderSet(reliableStateManagerReplica, BidBookName);
         }
@@ -73,7 +72,7 @@ namespace OrderBook
         {
             using (var fabricClient = new FabricClient())
             {
-                var partitionList = fabricClient.QueryManager.GetPartitionListAsync(context.ServiceName).Result;
+                var partitionList = fabricClient?.QueryManager?.GetPartitionListAsync(context.ServiceName).Result;
                 foreach (var partition in partitionList)
                 {
                     if (partition.PartitionInformation.Id == context.PartitionId)
@@ -126,7 +125,7 @@ namespace OrderBook
 
             await this.asks.AddOrderAsync(order);
 
-            MetricsLog.AskCreated(order);
+            MetricsLog?.AskCreated(order);
 
             return order.Id;
         }
@@ -152,7 +151,7 @@ namespace OrderBook
 
             await this.bids.AddOrderAsync(order);
 
-            MetricsLog.BidCreated(order);
+            MetricsLog?.BidCreated(order);
 
             return order.Id;
         }
@@ -291,7 +290,7 @@ namespace OrderBook
                     if (IsMatch(maxBid, minAsk))
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"New match: bid {maxBid.Id} and ask {minAsk.Id}");
-                        MetricsLog.OrderMatched(maxBid, minAsk);
+                        MetricsLog?.OrderMatched(maxBid, minAsk);
 
                         try
                         {
