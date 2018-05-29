@@ -12,7 +12,7 @@ namespace Fulfillment
         {
             if (string.IsNullOrWhiteSpace(user.Username))
             {
-                throw new InvalidTradeRequestException("Username cannot be null, empty or contain whitespace");
+                throw new InvalidUserRequestException("Username cannot be null, empty or contain whitespace");
             }
         }
 
@@ -56,11 +56,11 @@ namespace Fulfillment
             }
             if (buyer.LatestTrades.Any(t => t.Split("_").LastOrDefault() == trade.Bid.Id))
             {
-                throw new BadBuyerException("$The bid order has already been processed");
+                throw new DuplicateBidException("$The bid order has already been processed");
             }
             if (seller.LatestTrades.Any(t => t.Split("_").FirstOrDefault() == trade.Ask.Id))
             {
-                throw new BadSellerException("$The ask order has already been processed");
+                throw new DuplicateAskException("$The ask order has already been processed");
             }
         }
     }

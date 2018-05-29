@@ -52,7 +52,7 @@ namespace Fulfillment
             Init();
             this.Trades = new TradeQueue(this.StateManager, TradeQueueName);
             this.Users = new UserStoreClient();
-            
+
         }
 
         /// <summary>
@@ -162,7 +162,7 @@ namespace Fulfillment
         /// </summary>
         /// <param name="trade"></param>
         /// <returns></returns>
-        private async Task LogAsync(Trade trade)
+        private async Task AddTradeToLogAsync(Trade trade)
         {
             var randomParitionId = NextInt64(rand);
             var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
@@ -175,7 +175,7 @@ namespace Fulfillment
                     throw new TradeNotLoggedException();
                 }
             }
-            catch (Exception ex)
+            catch (HttpRequestException ex)
             {
                 // This will force a retry
                 ServiceEventSource.Current.ServiceMessage(this.Context, $"Error sending trade to logger service, error: {ex.Message}");
@@ -206,35 +206,41 @@ namespace Fulfillment
         /// <param name="seller"></param>
         /// <param name="buyer"></param>
         /// <returns></returns>
-        private async Task<bool> ExecuteTradeAsync(ITransaction tx, Trade trade, User seller, User buyer)
+        private async Task<bool> executeTradeAsync(Trade trade, User seller, User buyer)
         {
-            try
-            {
-                var newBuyer = buyer.AddTrade(trade.Id);
-                newBuyer.UpdateCurrencyAmount(trade.Settlement.Pair.GetBuyerWantCurrency(), trade.Settlement.Amount);
-                newBuyer.UpdateCurrencyAmount(trade.Settlement.Pair.GetSellerWantCurrency(), (trade.Settlement.Amount * trade.Settlement.Price) * -1.0);
-                newBuyer = new User(newBuyer.Id,
-                                newBuyer.Username,
-                                newBuyer.CurrencyAmounts,
-                                newBuyer.LatestTrades);
+            // This is not atomic - trades may be applied to one or both user
+            // and then the program could crash. Rather than worry about
+            // distributed transactions here, duplication is checked during
+            // validation.
+            var newBuyer = UpdateBuyer(trade, buyer);
+            var newSeller = UpdateSeller(trade, seller);
+            var buyerIsUpdated = await Users.UpdateUserAsync(newBuyer);
+            var sellerIsUpdated = await Users.UpdateUserAsync(newSeller);
+            return (buyerIsUpdated && sellerIsUpdated);
+        }
 
-                var newSeller = seller.AddTrade(trade.Id);
-                newSeller.UpdateCurrencyAmount(trade.Settlement.Pair.GetBuyerWantCurrency(), trade.Settlement.Amount * -1.0);
-                newSeller.UpdateCurrencyAmount(trade.Settlement.Pair.GetSellerWantCurrency(), (trade.Settlement.Amount * trade.Settlement.Price));
-                newSeller = new User(newSeller.Id,
-                                    newSeller.Username,
-                                    newSeller.CurrencyAmounts,
-                                    newSeller.LatestTrades);
+        private static User UpdateSeller(Trade trade, User seller)
+        {
+            var newSeller = seller.AddTrade(trade.Id);
+            newSeller.UpdateCurrencyAmount(trade.Settlement.Pair.GetBuyerWantCurrency(), trade.Settlement.Amount * -1.0);
+            newSeller.UpdateCurrencyAmount(trade.Settlement.Pair.GetSellerWantCurrency(), (trade.Settlement.Amount * trade.Settlement.Price));
+            newSeller = new User(newSeller.Id,
+                                newSeller.Username,
+                                newSeller.CurrencyAmounts,
+                                newSeller.LatestTrades);
+            return newSeller;
+        }
 
-                var buyerUpdated = await Users.UpdateUserAsync(newBuyer);
-                var sellerUpdated = await Users.UpdateUserAsync(newSeller);
-                return (buyerUpdated && sellerUpdated);
-            }
-            catch(Exception ex)
-            {
-                ServiceEventSource.Current.Message($"Error executing trade {ex.Message}");
-                return false;
-            }
+        private static User UpdateBuyer(Trade trade, User buyer)
+        {
+            var newBuyer = buyer.AddTrade(trade.Id);
+            newBuyer.UpdateCurrencyAmount(trade.Settlement.Pair.GetBuyerWantCurrency(), trade.Settlement.Amount);
+            newBuyer.UpdateCurrencyAmount(trade.Settlement.Pair.GetSellerWantCurrency(), (trade.Settlement.Amount * trade.Settlement.Price) * -1.0);
+            newBuyer = new User(newBuyer.Id,
+                            newBuyer.Username,
+                            newBuyer.CurrencyAmounts,
+                            newBuyer.LatestTrades);
+            return newBuyer;
         }
 
         protected override async Task RunAsync(CancellationToken cancellationToken)
@@ -272,6 +278,8 @@ namespace Fulfillment
                             var seller = await Users.GetUserAsync(trade.Ask.UserId);
                             var buyer = await Users.GetUserAsync(trade.Bid.UserId);
 
+                            bool duplicateOrder = false;
+
                             // If the trade is invalid, we'll throw an exception
                             // and remove it from the queue. If there is a transient
                             // failure, we'll abort and put it back on the queue.
@@ -293,34 +301,60 @@ namespace Fulfillment
                                 await tx.CommitAsync(); // Removes invalid orders from queue (in a real system we would re-add the valid bid)
                                 continue;
                             }
+                            catch (DuplicateAskException)
+                            {
+                                duplicateOrder = true;
+                                ServiceEventSource.Current.Message($"Duplicate ask ${trade.Id}");
+                            }
+                            catch (DuplicateBidException)
+                            {
+                                duplicateOrder = true;
+                                ServiceEventSource.Current.Message($"Duplicate bid ${trade.Id}");
+                            }
 
-                            var applied = await ExecuteTradeAsync(tx, trade, seller, buyer);
+                            try
+                            {
+                                await AddTradeToLogAsync(trade);
+                            }
+                            catch (TradeNotLoggedException)
+                            {
+                                // Failed to log the trade, backoff and retry
+                                await BackOff(cancellationToken);
+                                continue;
+                            }
+
+                            // If a duplicate order short cut the loop.
+                            // Reconcilation can happen on the backend.
+                            if (duplicateOrder) continue;  
+
+                            var applied = await executeTradeAsync(trade, seller, buyer);
                             if (applied)
                             {
                                 // Applied indicates both buyer and seller have been
                                 // successfully updated and the trade has been logged.
                                 // We can now commit the transaction to release our lock
                                 // on the queue.
-                                await LogAsync(trade);  // Log trade to an external persistence store
 
                                 ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} completed");
                                 await tx.CommitAsync();
-                                MetricsLog.Traded(trade, Metrics.TradedStatus.Completed );
+
+                                MetricsLog.Traded(trade, Metrics.TradedStatus.Completed);  // Record trade success
                             }
                             else
                             {
                                 // Atleast one of the buyer or seller failed to update
                                 // or we failed to log the trade.
 
-                                // We are dropping any failed message
-                                // this would normally be deadlettered.
+                                // We are immediately dropping any failed message this
+                                // would normally be deadlettered.
                                 ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} aborted");
                                 tx.Abort();
-                                MetricsLog.Traded(trade, Metrics.TradedStatus.Failed );
+
+                                MetricsLog.Traded(trade, Metrics.TradedStatus.Failed); // Record trade failed
                             }
                         }
                     }
-                    catch(TradeNotLoggedException)
+                    catch (TradeNotLoggedException)
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"Trade failed to log, abort transaction");
 
@@ -328,12 +362,12 @@ namespace Fulfillment
                         await BackOff(cancellationToken);
                         continue;
                     }
-                    catch(FabricNotPrimaryException)
+                    catch (FabricNotPrimaryException)
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric cannot perform write as it is not the primary replica");
                         return;
                     }
-                    catch(FabricNotReadableException)
+                    catch (FabricNotReadableException)
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric is not currently readable, aborting and will retry");
 
@@ -341,7 +375,7 @@ namespace Fulfillment
                         await BackOff(cancellationToken);
                         continue;
                     }
-                    catch(InvalidOperationException)
+                    catch (InvalidOperationException)
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid operation performed, aborting and will retry");
 
@@ -349,7 +383,7 @@ namespace Fulfillment
                         await BackOff(cancellationToken);
                         continue;
                     }
-                    catch(TimeoutException)
+                    catch (TimeoutException)
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"Operation timed out, aborting and will retry");
 

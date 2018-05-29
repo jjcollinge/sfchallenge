@@ -20,6 +20,7 @@ namespace Fulfillment.Controllers
             this.fulfillment = fulfillment;
         }
 
+        // GET api/users
         [HttpGet]
         public async Task<IActionResult> GetAsync()
         {
@@ -34,6 +35,7 @@ namespace Fulfillment.Controllers
             }
         }
 
+        // GET api/users/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetAsync(string id)
         {
@@ -52,6 +54,7 @@ namespace Fulfillment.Controllers
             }
         }
 
+        // POST api/users
         [HttpPost]
         public async Task<IActionResult> PostAsync([FromBody] UserRequestModel userRequest)
         {
@@ -74,6 +77,7 @@ namespace Fulfillment.Controllers
             }
         }
 
+        // PUT api/users
         [HttpPut]
         public async Task<IActionResult> PutAsync([FromBody] UserRequestModel userRequest)
         {
@@ -96,6 +100,7 @@ namespace Fulfillment.Controllers
             }
         }
 
+        // DELETE api/users
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAsync(string id)
         {

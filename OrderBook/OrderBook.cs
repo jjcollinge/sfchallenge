@@ -92,7 +92,7 @@ namespace OrderBook
                     }
                 }
             }
-            
+
             // Get configuration from our PackageRoot/Config/Setting.xml file
             var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
             reverseProxyPort = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["ReverseProxy_Port"].Value;
@@ -266,6 +266,7 @@ namespace OrderBook
 
             Order maxBid = null;
             Order minAsk = null;
+            Order leftOverAsk = null;
             Order settlement = null;
 
             while (true)
@@ -291,53 +292,16 @@ namespace OrderBook
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"New match: bid {maxBid.Id} and ask {minAsk.Id}");
                         MetricsLog.OrderMatched(maxBid, minAsk);
-                        
+
                         try
                         {
                             // We split the ask incase the seller had a bigger
                             // amount of currency than the buyer wished to buy.
                             // The cost per unit is kept consistent between the
                             // original ask and any left over asks.
-                            (var settledOrder, var leftOverAsk) = SettleTrade(maxBid, minAsk);
-                            if (leftOverAsk != null)
-                            {
-                                try
-                                {
-                                    await AddAskAsync(leftOverAsk); // Add the left over ask as a new order
-                                }
-                                catch (FabricNotPrimaryException ex)
-                                {
-                                    // If the fabric is not primary we should
-                                    // return control back to the platform.
-                                    ServiceEventSource.Current.ServiceException(this.Context, "Failed to add left over ask as fabric is not primary", ex);
-                                    return;
-                                }
-                                catch (FabricNotReadableException)
-                                {
-                                    // Fabric is not in a readable state. This
-                                    // is a transient error and should be retried.
-                                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric is not currently readable, aborting and will retry");
-                                    await BackOff(cancellationToken);
-                                    continue;
-                                }
-                                catch (FabricException ex)
-                                {
-                                    // If the fabric threw an exception, treat
-                                    // it as transient, back off and retry
-                                    ServiceEventSource.Current.ServiceException(this.Context, "Failed to add left over ask as fabric exception throw", ex);
-                                    await BackOff(cancellationToken);
-                                    continue;
-                                }
-                                catch (MaxOrdersExceededException ex)
-                                {
-                                    // If we have hit the maximum number of
-                                    // orders - drop the left over ask to
-                                    // avoid deadlock. The seller will have
-                                    // to resubmit the ask manually.
-                                    ServiceEventSource.Current.ServiceException(this.Context, "Failed to add left over ask as max orders exceeded", ex);
-                                }
-                            }
+                            (var settledOrder, var leftOver) = SettleTrade(maxBid, minAsk);
                             settlement = settledOrder;
+                            leftOverAsk = leftOver;
                         }
                         catch (InvalidAskException)
                         {
@@ -352,7 +316,45 @@ namespace OrderBook
                             await this.bids.RemoveAsync(maxBid);
                             await this.asks.RemoveAsync(minAsk); // In a real system we would leave the ask
                             continue;
+                        }
 
+                        if (leftOverAsk != null)
+                        {
+                            try
+                            {
+                                await AddAskAsync(leftOverAsk); // Add the left over ask as a new order
+                            }
+                            catch (FabricNotPrimaryException ex)
+                            {
+                                // If the fabric is not primary we should
+                                // return control back to the platform.
+                                ServiceEventSource.Current.ServiceException(this.Context, "Failed to add left over ask as fabric is not primary", ex);
+                                return;
+                            }
+                            catch (FabricNotReadableException)
+                            {
+                                // Fabric is not in a readable state. This
+                                // is a transient error and should be retried.
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric is not currently readable, aborting and will retry");
+                                await BackOff(cancellationToken);
+                                continue;
+                            }
+                            catch (FabricException ex)
+                            {
+                                // If the fabric threw an exception, treat
+                                // it as transient, back off and retry
+                                ServiceEventSource.Current.ServiceException(this.Context, "Failed to add left over ask as fabric exception throw", ex);
+                                await BackOff(cancellationToken);
+                                continue;
+                            }
+                            catch (MaxOrdersExceededException ex)
+                            {
+                                // If we have hit the maximum number of
+                                // orders - drop the left over ask to
+                                // avoid deadlock. The seller will have
+                                // to resubmit the ask manually.
+                                ServiceEventSource.Current.ServiceException(this.Context, "Failed to add left over ask as max orders exceeded", ex);
+                            }
                         }
 
                         var trade = new TradeRequestModel
@@ -423,42 +425,22 @@ namespace OrderBook
                         {
                             using (var tx = this.StateManager.CreateTransaction())
                             {
-                                try
-                                {
-                                    // If the response is successful, assume orders are safe to remove.
-                                    var removedAsk = await this.asks.RemoveAsync(tx, minAsk);
-                                    var removedBid = await this.bids.RemoveAsync(tx, maxBid);
-                                    if (removedAsk && removedBid)
-                                    {
-                                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Removed Ask {minAsk.Id} and Bid {maxBid.Id}");
-                                        await tx.CommitAsync(); // Committing our transaction will remove both the ask and the bid from our orders.
 
-                                        var tradeId = await res.Content.ReadAsStringAsync();
-                                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Created new trade with id '{tradeId}'");
-                                    }
-                                    else
-                                    {
-                                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Failed to remove orders, so requeuing");
-                                        tx.Abort(); // Abort the transaction to ensure both the ask and the bid stay in our orders.
-                                        continue;
-                                    }
-                                }
-                                catch (InvalidOperationException)
+                                // If the response is successful, assume orders are safe to remove.
+                                var removedAsk = await this.asks.RemoveAsync(tx, minAsk);
+                                var removedBid = await this.bids.RemoveAsync(tx, maxBid);
+                                if (removedAsk && removedBid)
                                 {
-                                    // Invalid operation whilst trying to remove
-                                    // orders from our order sets.
-                                    tx.Abort();
-                                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid operation performed, aborting and will retry");
-                                    await BackOff(cancellationToken);
-                                    continue;
+                                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Removed Ask {minAsk.Id} and Bid {maxBid.Id}");
+                                    await tx.CommitAsync(); // Committing our transaction will remove both the ask and the bid from our orders.
+
+                                    var tradeId = await res.Content.ReadAsStringAsync();
+                                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Created new trade with id '{tradeId}'");
                                 }
-                                catch (FabricNotReadableException)
+                                else
                                 {
-                                    // Fabric is not in a readable state. This
-                                    // is a transient error and should be retried.
-                                    tx.Abort();
-                                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric is not currently readable, aborting and will retry");
-                                    await BackOff(cancellationToken);
+                                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Failed to remove orders, so requeuing");
+                                    tx.Abort(); // Abort the transaction to ensure both the ask and the bid stay in our orders.
                                     continue;
                                 }
                             }

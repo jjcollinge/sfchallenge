@@ -61,9 +61,40 @@ namespace Logger
         /// <returns></returns>
         public async Task LogAsync(Trade trade)
         {
-            IReliableConcurrentQueue<Trade> exportQueue =
+            IReliableConcurrentQueue<Trade> trades =
              await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
 
+            var executed = false;
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (!executed && retryCount < 3)
+            {
+                try
+                {
+                    await executeAddTradeAsync(trade, trades);
+                    executed = true;
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add trade",
+                    exceptions);
+        }
+
+        private async Task executeAddTradeAsync(Trade trade, IReliableConcurrentQueue<Trade> exportQueue)
+        {
             using (var tx = this.StateManager.CreateTransaction())
             {
                 await exportQueue.EnqueueAsync(tx, trade);

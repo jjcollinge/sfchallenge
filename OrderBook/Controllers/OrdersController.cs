@@ -134,7 +134,6 @@ namespace OrderBook.Controllers
             catch (MaxOrdersExceededException)
             {
                 return new StatusCodeResult(429);
-
             }
         }
 

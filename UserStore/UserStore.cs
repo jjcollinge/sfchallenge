@@ -110,6 +110,39 @@ namespace UserStore
             IReliableDictionary<string, User> users =
               await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
 
+            var executed = false;
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (!executed && retryCount < 3)
+            {
+                try
+                {
+                    var userId = await executeAddUserAsync(user, users);
+                    executed = true;
+                    return userId;
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add user",
+                    exceptions);
+            return string.Empty; // no-op
+        }
+
+        private async Task<string> executeAddUserAsync(User user, IReliableDictionary<string, User> users)
+        {
             using (var tx = this.StateManager.CreateTransaction())
             {
                 var current = await users.TryGetValueAsync(tx, user.Id);
@@ -130,28 +163,55 @@ namespace UserStore
             IReliableDictionary<string, User> users =
               await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
 
-            using (var tx = this.StateManager.CreateTransaction())
+            var executed = false;
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (!executed && retryCount < 3)
             {
-                return await ExecuteUserUpdate(user, users, tx);
+                try
+                {
+                    var userId = await executeUpdateUserAsync(user, users);
+                    executed = true;
+                    return userId;
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
             }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to update user",
+                    exceptions);
+            return false; // no-op
         }
 
-        private async Task<bool> ExecuteUserUpdate(User user, IReliableDictionary<string, User> users, ITransaction tx)
+        private async Task<bool> executeUpdateUserAsync(User user, IReliableDictionary<string, User> users)
         {
             bool result;
-            var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
-            if (current.HasValue)
+            using (var tx = this.StateManager.CreateTransaction())
             {
-                result = await users.TryUpdateAsync(tx, user.Id, user, current.Value);
-                await tx.CommitAsync();
+                var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
+                if (current.HasValue)
+                {
+                    result = await users.TryUpdateAsync(tx, user.Id, user, current.Value);
+                    await tx.CommitAsync();
 
-                MetricsLog.UserUpdated(user);
+                    MetricsLog.UserUpdated(user);
+                }
+                else
+                {
+                    throw new ApplicationException($"Cannot update non existent user '{user.Id}'");
+                }
             }
-            else
-            {
-                throw new ApplicationException($"Cannot update non existent user '{user.Id}'");
-            }
-
             return result;
         }
 
@@ -160,6 +220,39 @@ namespace UserStore
             IReliableDictionary<string, User> users =
               await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
 
+            var executed = false;
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (!executed && retryCount < 3)
+            {
+                try
+                {
+                    var deleted = await executeDeleteUserAsync(userId, users);
+                    executed = true;
+                    return deleted;
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add user",
+                    exceptions);
+            return false; // no-op
+        }
+
+        private async Task<bool> executeDeleteUserAsync(string userId, IReliableDictionary<string, User> users)
+        {
             bool removed;
             using (var tx = this.StateManager.CreateTransaction())
             {
