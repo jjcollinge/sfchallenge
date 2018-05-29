@@ -155,7 +155,7 @@
     <!-- Create OrderBook Service -->
     <Service Name="OrderBook" ServiceDnsName="orderbook.exchange">
       <StatefulService ServiceTypeName="OrderBookType" TargetReplicaSetSize="[OrderBook_TargetReplicaSetSize]" MinReplicaSetSize="[OrderBook_MinReplicaSetSize]">
-        <SingletonPartition/>
+        <SingletonPartition />
       </StatefulService>
     </Service>
     <!-- Create Logger Service -->

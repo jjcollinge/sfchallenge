@@ -21,12 +21,12 @@ namespace Common
 
     public static class CurrencyPairExtensions
     {
-        public const string GBPUSD_SYMBOL = "GBP-USD";
-        public const string GBPEUR_SYMBOL = "GBP-EUR";
-        public const string USDGBP_SYMBOL = "USD-GBP";
-        public const string USDEUR_SYMBOL = "USD-EUR";
-        public const string EURGBP_SYMBOL = "EUR-GBP";
-        public const string EURUSD_SYMBOL = "EUR-USD";
+        public const string GBPUSD_SYMBOL = "GBPUSD";
+        public const string GBPEUR_SYMBOL = "GBPEUR";
+        public const string USDGBP_SYMBOL = "USDGBP";
+        public const string USDEUR_SYMBOL = "USDEUR";
+        public const string EURGBP_SYMBOL = "EURGBP";
+        public const string EURUSD_SYMBOL = "EURUSD";
 
         public static string ToFriendlyString(this CurrencyPair me)
         {
@@ -72,12 +72,12 @@ namespace Common
 
         public static string GetBuyerWantCurrency(this CurrencyPair me)
         {
-            return ToFriendlyString(me).Split('-')[0];
+            return ToFriendlyString(me).Substring(0, 3);
         }
 
         public static string GetSellerWantCurrency(this CurrencyPair me)
         {
-            return ToFriendlyString(me).Split('-')[1];
+            return ToFriendlyString(me).Substring(3, 3);
         }
     }
 

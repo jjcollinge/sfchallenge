@@ -116,6 +116,18 @@ namespace Fulfillment
         }
 
         /// <summary>
+        /// Updates a user in the user store.
+        /// </summary>
+        /// <param name="userRequest"></param>
+        /// <returns></returns>
+        public async Task<bool> UpdateUserAsync(UserRequestModel userRequest)
+        {
+            Validation.ThrowIfNotValidUserRequest(userRequest);
+            var success = await this.Users.UpdateUserAsync(userRequest);
+            return success;
+        }
+
+        /// <summary>
         /// Gets a specific user from the user store.
         /// </summary>
         /// <param name="userId"></param>
@@ -171,6 +183,11 @@ namespace Fulfillment
             }
         }
 
+        /// <summary>
+        /// Generates a random int 64
+        /// </summary>
+        /// <param name="rnd"></param>
+        /// <returns></returns>
         public static Int64 NextInt64(Random rnd)
         {
             var buffer = new byte[sizeof(Int64)];

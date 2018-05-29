@@ -14,6 +14,7 @@ namespace OrderBook
             Timestamp = DateTime.Now;
         }
 
+        public string CurrencyPair { get; set; }
         public List<KeyValuePair<string, Order>> Asks { get; set; }
         public List<KeyValuePair<string, Order>> Bids { get; set; }
         public int AsksCount { get; set; }

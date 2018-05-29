@@ -39,8 +39,6 @@ namespace Gateway
             // and then route requests to a partition.
             app.Run(async (context) =>
             {
-                context.Request.EnableBuffering();
-
                 if (context.Request.Path == "/")
                 {
                     context.Response.StatusCode = 502;
@@ -51,42 +49,25 @@ namespace Gateway
                 // Complete some CPU intensive work.
                 // This is used to make the Gateway
                 // a bottleneck. DO NOT REMOVE.
-                //FraudCheck.Check();
+                FraudCheck.Check();
 
                 if (IsOrderBookServiceRequest(context))
                 {
                     PartitionScheme partitioningScheme = await GetOrderBookParititoiningScheme();
 
-                    string bodyAsText = await new StreamReader(context.Request.Body).ReadToEndAsync();
-                    var order = JsonConvert.DeserializeObject<OrderRequestModel>(bodyAsText);
-                   
+                    var currency = GetAndRemoveCurrencyFromRequest(ref context);
                     if (partitioningScheme == PartitionScheme.Singleton)
                     {
                         // Handle bid and ask requests without parition
-                        if (order != null)
-                        { 
-                            // Default the currency pair to USD/GBP if not partitioned
-                            var newOrder = new OrderRequestModel {
-                                                    UserId = order.UserId,
-                                                    Pair = CurrencyPairExtensions.GBPUSD_SYMBOL,
-                                                    Amount = order.Amount,
-                                                    Price =  order.Price,
-                                                };
-                            var updatedBody = JsonConvert.SerializeObject(newOrder);
-                            var updatedContent = new StringContent(updatedBody, Encoding.UTF8, "application/json");
-                            string forwardingUrl = ForwardingUrl(context, "OrderBook");
-                            await ProxyRequestHelperWithStringContent(context, updatedContent, forwardingUrl);
-                        }
+                        string forwardingUrl = ForwardingUrl(context, "OrderBook");
+                        await ProxyRequestHelper(context, forwardingUrl);
+                        
                         return;
                     }
 
-                    var currency = order?.Pair;
                     if (partitioningScheme == PartitionScheme.Named && currency != string.Empty)
                     {
                         // Handle bid and ask requests with paritions
-                        var requestData = Encoding.UTF8.GetBytes(bodyAsText);
-                        var originalStream = new MemoryStream(requestData);
-                        context.Request.Body = originalStream;
                         string forwardingUrl = ForwardingUrl(context, "OrderBook");
                         var partitionedEndpoint = $"{forwardingUrl}?PartitionKey={currency}&PartitionKind=Named";
                         await ProxyRequestHelper(context, partitionedEndpoint);
@@ -150,6 +131,41 @@ namespace Gateway
             }
         }
 
+        private string GetAndRemoveCurrencyFromRequest(ref HttpContext context)
+        {
+            if (context.Request.Path.Value.Contains(CurrencyPairExtensions.GBPUSD_SYMBOL))
+            {
+                context.Request.Path = context.Request.Path.Value.Replace(CurrencyPairExtensions.GBPUSD_SYMBOL, "");
+                return CurrencyPairExtensions.GBPUSD_SYMBOL;
+            }
+            if (context.Request.Path.Value.Contains(CurrencyPairExtensions.GBPEUR_SYMBOL))
+            {
+                context.Request.Path = context.Request.Path.Value.Replace(CurrencyPairExtensions.GBPEUR_SYMBOL, "");
+                return CurrencyPairExtensions.GBPEUR_SYMBOL;
+            }
+            if (context.Request.Path.Value.Contains(CurrencyPairExtensions.USDGBP_SYMBOL))
+            {
+                context.Request.Path = context.Request.Path.Value.Replace(CurrencyPairExtensions.USDGBP_SYMBOL, "");
+                return CurrencyPairExtensions.USDGBP_SYMBOL;
+            }
+            if (context.Request.Path.Value.Contains(CurrencyPairExtensions.USDEUR_SYMBOL))
+            {
+                context.Request.Path = context.Request.Path.Value.Replace(CurrencyPairExtensions.USDEUR_SYMBOL, "");
+                return CurrencyPairExtensions.USDEUR_SYMBOL;
+            }
+            if (context.Request.Path.Value.Contains(CurrencyPairExtensions.EURGBP_SYMBOL))
+            {
+                context.Request.Path = context.Request.Path.Value.Replace(CurrencyPairExtensions.EURGBP_SYMBOL, "");
+                return CurrencyPairExtensions.EURGBP_SYMBOL;
+            }
+            if (context.Request.Path.Value.Contains(CurrencyPairExtensions.EURUSD_SYMBOL))
+            {
+                context.Request.Path = context.Request.Path.Value.Replace(CurrencyPairExtensions.EURUSD_SYMBOL, "");
+                return CurrencyPairExtensions.EURUSD_SYMBOL;
+            }
+            return CurrencyPairExtensions.GBPUSD_SYMBOL;
+        }
+
         private static bool IsOrderBookServiceRequest(HttpContext context)
         {
             return context.Request.Path.Value.Contains("api/orders");
@@ -175,8 +191,7 @@ namespace Gateway
             {
                 endpoint += context.Request.QueryString.Value;
             }
-
-            return endpoint;
+            return endpoint.TrimEnd('/'); ;
         }
     }
     public static class Extensions

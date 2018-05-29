@@ -47,10 +47,12 @@ namespace OrderBook
         private int maxPendingBids;
         private const int backOffDurationInSec = 2;
 
+        public string PartitionName { get; private set; }
+
         public OrderBook(StatefulServiceContext context)
             : base(context)
         {
-            Init();
+            Init(context);
             this.asks = new OrderSet(this.StateManager, AskBookName);
             this.bids = new OrderSet(this.StateManager, BidBookName);
         }
@@ -59,7 +61,7 @@ namespace OrderBook
         public OrderBook(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
-            Init();
+            Init(context);
             this.asks = new OrderSet(reliableStateManagerReplica, AskBookName);
             this.bids = new OrderSet(reliableStateManagerReplica, BidBookName);
         }
@@ -67,8 +69,30 @@ namespace OrderBook
         /// <summary>
         /// Init setups in any configuration values
         /// </summary>
-        private void Init()
+        private void Init(ServiceContext context)
         {
+            using (var fabricClient = new FabricClient())
+            {
+                var partitionList = fabricClient.QueryManager.GetPartitionListAsync(context.ServiceName).Result;
+                foreach (var partition in partitionList)
+                {
+                    if (partition.PartitionInformation.Id == context.PartitionId)
+                    {
+                        if (partition.PartitionInformation.Kind == ServicePartitionKind.Named)
+                        {
+                            var namedPartitionInfo = partition.PartitionInformation as NamedPartitionInformation;
+                            PartitionName = namedPartitionInfo.Name;
+                            break;
+                        }
+                        if (partition.PartitionInformation.Kind == ServicePartitionKind.Singleton)
+                        {
+                            PartitionName = CurrencyPairExtensions.GBPUSD_SYMBOL;
+                            break;
+                        }
+                    }
+                }
+            }
+            
             // Get configuration from our PackageRoot/Config/Setting.xml file
             var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
             reverseProxyPort = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["ReverseProxy_Port"].Value;
@@ -317,18 +341,16 @@ namespace OrderBook
                         }
                         catch (InvalidAskException)
                         {
-                            // The ask did not meet our validation criteria.
-                            // The bid may still be valid so we'll leave it.
                             ServiceEventSource.Current.ServiceMessage(this.Context, $"Dropping invalid Asks");
                             await this.asks.RemoveAsync(minAsk);
+                            await this.bids.RemoveAsync(maxBid); // In a real system we would leave the bid
                             continue;
                         }
                         catch (InvalidBidException)
                         {
-                            // The bid did not meet our validation criteria.
-                            // The ask may still be valid so we'll leave it.
                             ServiceEventSource.Current.ServiceMessage(this.Context, $"Droping invalid Bids");
                             await this.bids.RemoveAsync(maxBid);
+                            await this.asks.RemoveAsync(minAsk); // In a real system we would leave the ask
                             continue;
 
                         }

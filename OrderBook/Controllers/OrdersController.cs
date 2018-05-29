@@ -34,6 +34,7 @@ namespace OrderBook.Controllers
                 var bidsCount = bids.Count;
                 var view = new OrderBookViewModel
                 {
+                    CurrencyPair = orderBook.PartitionName,
                     Asks = asks,
                     Bids = bids,
                     AsksCount = asksCount,
@@ -105,6 +106,11 @@ namespace OrderBook.Controllers
         {
             try
             {
+                // This allows load testing to target singleton and partitioned services
+                if (order.Pair != orderBook.PartitionName)
+                {
+                    order.Pair = orderBook.PartitionName;
+                }
                 var orderId = await this.orderBook.AddBidAsync(order);
                 return this.Ok(orderId);
             }
@@ -138,6 +144,10 @@ namespace OrderBook.Controllers
         {
             try
             {
+                if (order.Pair != orderBook.PartitionName)
+                {
+                    order.Pair = orderBook.PartitionName;
+                }
                 var orderId = await this.orderBook.AddAskAsync(order);
                 return this.Ok(orderId);
             }

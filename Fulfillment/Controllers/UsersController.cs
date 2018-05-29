@@ -74,6 +74,28 @@ namespace Fulfillment.Controllers
             }
         }
 
+        [HttpPut]
+        public async Task<IActionResult> PutAsync([FromBody] UserRequestModel userRequest)
+        {
+            try
+            {
+                var success = await this.fulfillment.UpdateUserAsync(userRequest);
+                return this.Ok(success);
+            }
+            catch (InvalidUserRequestException ex)
+            {
+                return new ContentResult { StatusCode = 400, Content = ex.Message };
+            }
+            catch (FabricNotPrimaryException)
+            {
+                return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
+            }
+            catch (FabricException)
+            {
+                return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
+            }
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAsync(string id)
         {

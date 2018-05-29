@@ -36,10 +36,22 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gateway", "Gateway\Gateway.
 		{451F270C-4BCB-47EF-A5CB-4776CB5A1A52} = {451F270C-4BCB-47EF-A5CB-4776CB5A1A52}
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Integrations", "Integrations", "{C3072B08-9429-41DE-B890-573421BA0857}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{21396D5F-851F-45EE-87B3-3C5F42D0091D}"
 	ProjectSection(SolutionItems) = preProject
-		Integrations\create_many_orders_and_process.ps1 = Integrations\create_many_orders_and_process.ps1
-		Integrations\create_match_transfer.ps1 = Integrations\create_match_transfer.ps1
+		Scripts\create_n_orders.ps1 = Scripts\create_n_orders.ps1
+		Scripts\LoadTestDefinition.json = Scripts\LoadTestDefinition.json
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "fixtures", "fixtures", "{189BC54B-CCD7-4569-89B8-F6A49BB7D251}"
+	ProjectSection(SolutionItems) = preProject
+		Scripts\fixtures\order.0.json = Scripts\fixtures\order.0.json
+		Scripts\fixtures\order.1.json = Scripts\fixtures\order.1.json
+		Scripts\fixtures\order.2.json = Scripts\fixtures\order.2.json
+		Scripts\fixtures\order.3.json = Scripts\fixtures\order.3.json
+		Scripts\fixtures\order.4.json = Scripts\fixtures\order.4.json
+		Scripts\fixtures\order.5.json = Scripts\fixtures\order.5.json
+		Scripts\fixtures\user1.json = Scripts\fixtures\user1.json
+		Scripts\fixtures\user2.json = Scripts\fixtures\user2.json
 	EndProjectSection
 EndProject
 Global
@@ -132,6 +144,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{189BC54B-CCD7-4569-89B8-F6A49BB7D251} = {21396D5F-851F-45EE-87B3-3C5F42D0091D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A12944CE-089A-4678-BA47-0D4A056A520F}
