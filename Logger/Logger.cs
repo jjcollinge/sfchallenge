@@ -40,7 +40,6 @@ namespace Logger
         public Logger(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
-            Init();
         }
 
         /// <summary>
