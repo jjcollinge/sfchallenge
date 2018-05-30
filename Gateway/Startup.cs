@@ -46,9 +46,7 @@ namespace Gateway
                     return;
                 }
 
-                // Complete some CPU intensive work.
-                // This is used to make the Gateway
-                // a bottleneck. DO NOT REMOVE.
+                // REQUIRED, DO NOT REMOVE.
                 FraudCheck.Check();
 
                 if (IsOrderBookServiceRequest(context))

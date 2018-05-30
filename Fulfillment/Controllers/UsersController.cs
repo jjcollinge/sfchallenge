@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Fabric;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Common;
 using Microsoft.AspNetCore.Http;
@@ -60,7 +61,7 @@ namespace Fulfillment.Controllers
         {
             try
             {
-                var id = await this.fulfillment.AddUserAsync(userRequest);
+                var id = await this.fulfillment.AddUserAsync(userRequest, CancellationToken.None);
                 return this.Ok(id);
             }
             catch (InvalidUserRequestException ex)
@@ -83,7 +84,7 @@ namespace Fulfillment.Controllers
         {
             try
             {
-                var success = await this.fulfillment.UpdateUserAsync(userRequest);
+                var success = await this.fulfillment.UpdateUserAsync(userRequest, CancellationToken.None);
                 return this.Ok(success);
             }
             catch (InvalidUserRequestException ex)
@@ -106,7 +107,7 @@ namespace Fulfillment.Controllers
         {
             try
             {
-                var removed = await this.fulfillment.DeleteUserAsync(id);
+                var removed = await this.fulfillment.DeleteUserAsync(id, CancellationToken.None);
                 if (!removed)
                 {
                     return this.NotFound();

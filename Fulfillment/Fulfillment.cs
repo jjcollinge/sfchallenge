@@ -106,10 +106,10 @@ namespace Fulfillment
         /// </summary>
         /// <param name="user"></param>
         /// <returns></returns>
-        public async Task<string> AddUserAsync(UserRequestModel userRequest)
+        public async Task<string> AddUserAsync(UserRequestModel userRequest, CancellationToken cancellationToken)
         {
             Validation.ThrowIfNotValidUserRequest(userRequest);
-            var userId = await this.Users.AddUserAsync(userRequest);
+            var userId = await this.Users.AddUserAsync(userRequest, cancellationToken);
             return userId;
         }
 
@@ -118,10 +118,10 @@ namespace Fulfillment
         /// </summary>
         /// <param name="userRequest"></param>
         /// <returns></returns>
-        public async Task<bool> UpdateUserAsync(UserRequestModel userRequest)
+        public async Task<bool> UpdateUserAsync(UserRequestModel userRequest, CancellationToken cancellationToken)
         {
             Validation.ThrowIfNotValidUserRequest(userRequest);
-            var success = await this.Users.UpdateUserAsync(userRequest);
+            var success = await this.Users.UpdateUserAsync(userRequest, cancellationToken);
             return success;
         }
 
@@ -149,9 +149,9 @@ namespace Fulfillment
         /// </summary>
         /// <param name="userId"></param>
         /// <returns></returns>
-        public async Task<bool> DeleteUserAsync(string userId)
+        public async Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken)
         {
-            return await this.Users.DeleteUserAsync(userId);
+            return await this.Users.DeleteUserAsync(userId, cancellationToken);
         }
 
         /// <summary>
@@ -160,14 +160,14 @@ namespace Fulfillment
         /// </summary>
         /// <param name="trade"></param>
         /// <returns></returns>
-        private async Task AddTradeToLogAsync(Trade trade)
+        private async Task AddTradeToLogAsync(Trade trade, CancellationToken cancellationToken)
         {
             var randomParitionId = NextInt64(rand);
             var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
             HttpResponseMessage res;
             try
             {
-                res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Logger/api/logger?PartitionKey={randomParitionId.ToString()}&PartitionKind=Int64Range", content);
+                res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Logger/api/logger?PartitionKey={randomParitionId.ToString()}&PartitionKind=Int64Range", content, cancellationToken);
                 if (!res.IsSuccessStatusCode)
                 {
                     throw new TradeNotLoggedException();
@@ -204,7 +204,7 @@ namespace Fulfillment
         /// <param name="seller"></param>
         /// <param name="buyer"></param>
         /// <returns></returns>
-        private async Task<bool> executeTradeAsync(Trade trade, User seller, User buyer)
+        private async Task<bool> ExecuteTradeAsync(Trade trade, User seller, User buyer, CancellationToken cancellationToken)
         {
             // This is not atomic - trades may be applied to one or both user
             // and then the program could crash. Rather than worry about
@@ -212,8 +212,8 @@ namespace Fulfillment
             // validation.
             var newBuyer = UpdateBuyer(trade, buyer);
             var newSeller = UpdateSeller(trade, seller);
-            var buyerIsUpdated = await Users.UpdateUserAsync(newBuyer);
-            var sellerIsUpdated = await Users.UpdateUserAsync(newSeller);
+            var buyerIsUpdated = await Users.UpdateUserAsync(newBuyer, cancellationToken);
+            var sellerIsUpdated = await Users.UpdateUserAsync(newSeller, cancellationToken);
             return (buyerIsUpdated && sellerIsUpdated);
         }
 
@@ -312,7 +312,7 @@ namespace Fulfillment
 
                             try
                             {
-                                await AddTradeToLogAsync(trade);
+                                await AddTradeToLogAsync(trade, cancellationToken);
                             }
                             catch (TradeNotLoggedException)
                             {
@@ -325,7 +325,7 @@ namespace Fulfillment
                             // Reconcilation can happen on the backend.
                             if (duplicateOrder) continue;  
 
-                            var applied = await executeTradeAsync(trade, seller, buyer);
+                            var applied = await ExecuteTradeAsync(trade, seller, buyer, cancellationToken);
                             if (applied)
                             {
                                 // Applied indicates both buyer and seller have been

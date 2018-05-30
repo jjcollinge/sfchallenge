@@ -1,5 +1,6 @@
 ﻿using Common;
 using ServiceFabric.Mocks;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -21,7 +22,7 @@ namespace Fulfillment.Tests
                 Username = username,
             };
 
-            await Assert.ThrowsAsync<InvalidUserRequestException>(() => service.AddUserAsync(request));
+            await Assert.ThrowsAsync<InvalidUserRequestException>(() => service.AddUserAsync(request, CancellationToken.None));
         }
     }
 }

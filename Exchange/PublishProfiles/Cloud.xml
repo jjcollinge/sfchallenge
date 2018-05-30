@@ -23,4 +23,7 @@
   <ClusterConnectionParameters ConnectionEndpoint="dotjsontest.westeurope.cloudapp.azure.com:19000" X509Credential="true" ServerCertThumbprint="3C7B1953A836AF49AB111DFAA1A0B7BFBD5CDC54" FindType="FindByThumbprint" FindValue="3C7B1953A836AF49AB111DFAA1A0B7BFBD5CDC54" StoreLocation="CurrentUser" StoreName="My" />
   <ApplicationParameterFile Path="..\ApplicationParameters\Cloud.xml" />
   <CopyPackageParameters CompressPackage="true" />
+  <UpgradeDeployment Mode="Monitored" Enabled="false">
+    <Parameters FailureAction="Rollback" Force="True" />
+  </UpgradeDeployment>
 </PublishProfile>

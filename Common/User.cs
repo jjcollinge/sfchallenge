@@ -19,7 +19,7 @@ namespace Common
     [DataContract]
     public sealed class User : IEquatable<User>
     {
-        private const int latestTradeCount = 100;
+        private const int tradeMax = 100;
 
         public User(string id, string username, IEnumerable<KeyValuePair<string, double>> currencyAmounts, IEnumerable<string> trades)
         {
@@ -68,14 +68,15 @@ namespace Common
 
         public User AddTrade(string tradeId)
         {
-            if (LatestTrades.Count() <= latestTradeCount)
+            if (LatestTrades.Count() <= tradeMax)
             {
                 return new User(Id, Username, CurrencyAmounts, ((IImmutableQueue<string>)LatestTrades).Enqueue(tradeId));
             }
             else
             {
-                ((IImmutableQueue<string>)LatestTrades).Dequeue();
-                return new User(Id, Username, CurrencyAmounts, ((IImmutableQueue<string>)LatestTrades).Enqueue(tradeId));
+                var queue = ((IImmutableQueue<string>)LatestTrades).Dequeue();
+                var newQueue = queue.Enqueue(tradeId);
+                return new User(Id, Username, CurrencyAmounts, newQueue);
             }
         }
 

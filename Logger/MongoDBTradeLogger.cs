@@ -46,11 +46,11 @@ namespace Logger
             try
             {
                 var doc = trade.ToBsonDocument();
-                await collection.InsertOneAsync(doc, null, cancellationToken);
-            }
-            catch (MongoDuplicateKeyException)
-            {
-                return; // Key already stored
+                var res = await collection.ReplaceOneAsync(
+                    filter: new BsonDocument("_id", trade.Id),
+                    options: new UpdateOptions { IsUpsert = true },
+                    replacement: doc,
+                    cancellationToken: cancellationToken);
             }
             catch (MongoConnectionException ex)
             {

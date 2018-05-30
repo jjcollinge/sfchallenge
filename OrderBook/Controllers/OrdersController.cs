@@ -23,6 +23,8 @@ namespace OrderBook.Controllers
             this.orderBook = orderBook;
         }
 
+
+        // GET api/orders
         [HttpGet]
         public async Task<IActionResult> GetAsync()
         {
@@ -48,6 +50,7 @@ namespace OrderBook.Controllers
             }
         }
 
+        // DELETE api/orders
         [HttpDelete]
         public async Task<IActionResult> DeleteAsync()
         {
@@ -66,6 +69,7 @@ namespace OrderBook.Controllers
             }
         }
 
+        // GET api/orders/bids
         [Route("bids")]
         [HttpGet]
         public async Task<IActionResult> Bids()
@@ -85,6 +89,7 @@ namespace OrderBook.Controllers
             }
         }
 
+        // GET api/orders/asks
         [Route("asks")]
         [HttpGet]
         public async Task<IActionResult> Asks()
@@ -100,6 +105,7 @@ namespace OrderBook.Controllers
             }
         }
 
+        // POST api/orders/bid
         [Route("bid")]
         [HttpPost]
         public async Task<IActionResult> Bid([FromBody] OrderRequestModel order)
@@ -137,6 +143,7 @@ namespace OrderBook.Controllers
             }
         }
 
+        // POST api/orders/ask
         [Route("ask")]
         [HttpPost]
         public async Task<IActionResult> Ask([FromBody] OrderRequestModel order)

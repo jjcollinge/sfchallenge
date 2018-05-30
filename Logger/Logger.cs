@@ -59,7 +59,7 @@ namespace Logger
         /// </summary>
         /// <param name="trade"></param>
         /// <returns></returns>
-        public async Task LogAsync(Trade trade)
+        public async Task LogAsync(Trade trade, CancellationToken cancellationToken)
         {
             IReliableConcurrentQueue<Trade> trades =
              await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
@@ -69,9 +69,11 @@ namespace Logger
             List<Exception> exceptions = new List<Exception>();
             while (!executed && retryCount < 3)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 try
                 {
-                    await executeAddTradeAsync(trade, trades);
+                    await executeAddTradeAsync(trade, trades, cancellationToken);
                     executed = true;
                 }
                 catch (TimeoutException ex)
@@ -93,13 +95,21 @@ namespace Logger
                     exceptions);
         }
 
-        private async Task executeAddTradeAsync(Trade trade, IReliableConcurrentQueue<Trade> exportQueue)
+        private async Task executeAddTradeAsync(Trade trade, IReliableConcurrentQueue<Trade> exportQueue, CancellationToken cancellationToken)
         {
             using (var tx = this.StateManager.CreateTransaction())
             {
-                await exportQueue.EnqueueAsync(tx, trade);
+                await exportQueue.EnqueueAsync(tx, trade, cancellationToken);
                 await tx.CommitAsync();
             }
+        }
+
+        public async Task<long> CountAsync()
+        {
+            IReliableConcurrentQueue<Trade> trades =
+             await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
+
+            return trades.Count;
         }
 
         protected override async Task RunAsync(CancellationToken cancellationToken)
@@ -174,7 +184,7 @@ namespace Logger
                     {
                         // Insert failed, assume connection problem and transient.
                         // backoff and retry
-                        ServiceEventSource.Current.ServiceMessage(this.Context, ex.Message);
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Logger error,  {ex.Message}");
                         await BackOff(cancellationToken);
                         continue;
                     }

@@ -1,4 +1,5 @@
-﻿using MongoDB.Bson.Serialization.Attributes;
+﻿using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System;
@@ -140,6 +141,7 @@ namespace Common
         public readonly string UserId;
 
         [BsonElement(elementName: "currencyPair")]
+        [BsonRepresentation(BsonType.String)]
         [DataMember]
         [JsonConverter(typeof(StringEnumConverter))]
         public readonly CurrencyPair Pair;

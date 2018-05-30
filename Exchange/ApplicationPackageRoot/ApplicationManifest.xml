@@ -30,18 +30,18 @@
     You have an SLA with management to block new trades when 800 existing trades are pending
     Changing this value with fail a system audit. Other approaches much be used to scale 
     -->
-    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="700" />
+    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="800" />
     <!-- OrderBook parameters -->
     <Parameter Name="OrderBook_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="OrderBook_PartitionCount" DefaultValue="1" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" DefaultValue="3" />
     <Parameter Name="OrderBook_Port" DefaultValue="9081" />
     <!--
-    You have an SLA with management to block new orders when 200 existing orders are pending
+    You have an SLA with management to block new orders when 500 existing orders are pending
     Changing this value with fail a system audit. Other approaches much be used to scale 
     -->
-    <Parameter Name="OrderBook_MaxBidsPending" DefaultValue="130" />
-    <Parameter Name="OrderBook_MaxAsksPending" DefaultValue="130" />
+    <Parameter Name="OrderBook_MaxBidsPending" DefaultValue="500" />
+    <Parameter Name="OrderBook_MaxAsksPending" DefaultValue="500" />
   </Parameters>
   <!-- Import Service Manifests -->
   <ServiceManifestImport>
@@ -155,7 +155,14 @@
     <!-- Create OrderBook Service -->
     <Service Name="OrderBook" ServiceDnsName="orderbook.exchange">
       <StatefulService ServiceTypeName="OrderBookType" TargetReplicaSetSize="[OrderBook_TargetReplicaSetSize]" MinReplicaSetSize="[OrderBook_MinReplicaSetSize]">
-        <SingletonPartition />
+        <NamedPartition>
+          <Partition Name="GBPUSD" />
+          <Partition Name="GBPEUR" />
+          <Partition Name="USDGBP" />
+          <Partition Name="USDEUR" />
+          <Partition Name="EURGBP" />
+          <Partition Name="EURUSD" />
+        </NamedPartition>
       </StatefulService>
     </Service>
     <!-- Create Logger Service -->

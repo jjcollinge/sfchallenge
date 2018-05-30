@@ -14,7 +14,7 @@ using Microsoft.ServiceFabric.Data;
 namespace UserStore
 {
     /// <summary>
-    /// A statefull service, used to store Users. Access via binary remoting based on the V2 Remoting stack
+    /// A stateful service, used to store Users. Access via binary remoting based on the V2 Remoting stack
     /// </summary>
     public sealed class UserStore : StatefulService, IUserStore
     {
@@ -29,7 +29,6 @@ namespace UserStore
         public UserStore(StatefulServiceContext context, IReliableStateManagerReplica2 reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
-            Init();
         }
 
         private void Init()
@@ -105,7 +104,7 @@ namespace UserStore
             return returnList;
         }
 
-        public async Task<string> AddUserAsync(User user)
+        public async Task<string> AddUserAsync(User user, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, User> users =
               await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
@@ -115,9 +114,11 @@ namespace UserStore
             List<Exception> exceptions = new List<Exception>();
             while (!executed && retryCount < 3)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 try
                 {
-                    var userId = await executeAddUserAsync(user, users);
+                    var userId = await ExecuteAddUserAsync(user, users, cancellationToken);
                     executed = true;
                     return userId;
                 }
@@ -141,7 +142,7 @@ namespace UserStore
             return string.Empty; // no-op
         }
 
-        private async Task<string> executeAddUserAsync(User user, IReliableDictionary<string, User> users)
+        private async Task<string> ExecuteAddUserAsync(User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
         {
             using (var tx = this.StateManager.CreateTransaction())
             {
@@ -150,7 +151,7 @@ namespace UserStore
                 {
                     return user.Id; // Return existing user
                 }
-                await users.AddAsync(tx, user.Id, user);
+                await users.AddAsync(tx, user.Id, user, TimeSpan.FromSeconds(15), cancellationToken);
                 await tx.CommitAsync();
 
                 MetricsLog?.UserCreated(user);
@@ -158,7 +159,7 @@ namespace UserStore
             return user.Id;
         }
 
-        public async Task<bool> UpdateUserAsync(User user)
+        public async Task<bool> UpdateUserAsync(User user, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, User> users =
               await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
@@ -168,9 +169,11 @@ namespace UserStore
             List<Exception> exceptions = new List<Exception>();
             while (!executed && retryCount < 3)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 try
                 {
-                    var userId = await executeUpdateUserAsync(user, users);
+                    var userId = await ExecuteUpdateUserAsync(user, users, cancellationToken);
                     executed = true;
                     return userId;
                 }
@@ -194,7 +197,7 @@ namespace UserStore
             return false; // no-op
         }
 
-        private async Task<bool> executeUpdateUserAsync(User user, IReliableDictionary<string, User> users)
+        private async Task<bool> ExecuteUpdateUserAsync(User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
         {
             bool result;
             using (var tx = this.StateManager.CreateTransaction())
@@ -202,7 +205,7 @@ namespace UserStore
                 var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
                 if (current.HasValue)
                 {
-                    result = await users.TryUpdateAsync(tx, user.Id, user, current.Value);
+                    result = await users.TryUpdateAsync(tx, user.Id, user, current.Value, TimeSpan.FromSeconds(15), cancellationToken);
                     await tx.CommitAsync();
 
                     MetricsLog?.UserUpdated(user);
@@ -215,7 +218,7 @@ namespace UserStore
             return result;
         }
 
-        public async Task<bool> DeleteUserAsync(string userId)
+        public async Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, User> users =
               await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
@@ -225,9 +228,10 @@ namespace UserStore
             List<Exception> exceptions = new List<Exception>();
             while (!executed && retryCount < 3)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    var deleted = await executeDeleteUserAsync(userId, users);
+                    var deleted = await ExecuteDeleteUserAsync(userId, users, cancellationToken);
                     executed = true;
                     return deleted;
                 }
@@ -251,12 +255,12 @@ namespace UserStore
             return false; // no-op
         }
 
-        private async Task<bool> executeDeleteUserAsync(string userId, IReliableDictionary<string, User> users)
+        private async Task<bool> ExecuteDeleteUserAsync(string userId, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
         {
             bool removed;
             using (var tx = this.StateManager.CreateTransaction())
             {
-                var result = await users.TryRemoveAsync(tx, userId);
+                var result = await users.TryRemoveAsync(tx, userId, TimeSpan.FromSeconds(15), cancellationToken);
                 if (result.HasValue)
                 {
                     removed = true;

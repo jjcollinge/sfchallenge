@@ -147,7 +147,6 @@ namespace OrderBook
                 ServiceEventSource.Current.ServiceMaxPendingLimitHit();
                 throw new MaxOrdersExceededException(currentBids);
             }
-            // Changes will fail an audit ^
 
             await this.bids.AddOrderAsync(order);
 
@@ -340,11 +339,16 @@ namespace OrderBook
                             }
                             catch (FabricException ex)
                             {
-                                // If the fabric threw an exception, treat
-                                // it as transient, back off and retry
                                 ServiceEventSource.Current.ServiceException(this.Context, "Failed to add left over ask as fabric exception throw", ex);
-                                await BackOff(cancellationToken);
-                                continue;
+
+                                if (IsTransientError(ex.ErrorCode))
+                                {
+                                    // Transient error, we can backoff and retry
+                                    await BackOff(cancellationToken);
+                                    continue;
+                                }
+                                // Non transient error, re-throw
+                                throw ex;
                             }
                             catch (MaxOrdersExceededException ex)
                             {
@@ -382,10 +386,9 @@ namespace OrderBook
                         }
                         catch (TaskCanceledException)
                         {
-                            // Task has been cancelled, we'll back off and retry.
+                            // Task has been cancelled, assume SF want's to close us.
                             ServiceEventSource.Current.ServiceMessage(this.Context, $"Request to fulfillment service timed out, backing off and retrying.");
-                            await BackOff(cancellationToken);
-                            continue;
+                            return;
                         }
 
                         // If the response from the Fulfillment API was not 2xx
@@ -471,6 +474,19 @@ namespace OrderBook
                     ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric cannot perform write as it is not the primary replica");
                     return;
                 }
+            }
+        }
+
+        private bool IsTransientError(FabricErrorCode errorCode)
+        {
+            switch (errorCode)
+            {
+                case FabricErrorCode.GatewayNotReachable:
+                    return true;
+                case FabricErrorCode.ServiceTooBusy:
+                    return true;
+                default:
+                    return false;
             }
         }
 

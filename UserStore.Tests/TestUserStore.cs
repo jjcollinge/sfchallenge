@@ -2,6 +2,7 @@
 using Microsoft.ServiceFabric.Data.Collections;
 using ServiceFabric.Mocks;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -25,7 +26,7 @@ namespace UserStore.Tests
                 });
 
             //create state
-            await service.AddUserAsync(sutUser);
+            await service.AddUserAsync(sutUser, CancellationToken.None);
 
             //get state
             var dictionary = await stateManager.TryGetAsync<IReliableDictionary<string, User>>(UserStore.StateManagerKey);

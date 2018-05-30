@@ -4,6 +4,7 @@ using System.Fabric;
 using System.Fabric.Query;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Common;
 using Microsoft.ServiceFabric.Services.Client;
@@ -32,11 +33,11 @@ namespace UserStore.Interface
             _userStoreServiceUri = serviceUriBuilder.ToUri();
         }
 
-        public async Task<string> AddUserAsync(User user)
+        public async Task<string> AddUserAsync(User user, CancellationToken cancellationToken)
         {
             var userStoreProxy = GetUserStoreProxy(user);
 
-            return await userStoreProxy.AddUserAsync(user);
+            return await userStoreProxy.AddUserAsync(user, cancellationToken);
         }
 
         /// <summary>
@@ -73,11 +74,11 @@ namespace UserStore.Interface
             return usersInPartition;
         }
 
-        public async Task<bool> DeleteUserAsync(string userId)
+        public async Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken)
         {
             var userStoreProxy = GetUserStoreProxy(userId);
 
-            return await userStoreProxy.DeleteUserAsync(userId);
+            return await userStoreProxy.DeleteUserAsync(userId, cancellationToken);
         }
 
         public async Task<User> GetUserAsync(string userId)
@@ -87,11 +88,11 @@ namespace UserStore.Interface
             return await userStoreProxy.GetUserAsync(userId);
         }
 
-        public async Task<bool> UpdateUserAsync(User user)
+        public async Task<bool> UpdateUserAsync(User user, CancellationToken cancellationToken)
         {
             var userStoreProxy = GetUserStoreProxy(user);
 
-            return await userStoreProxy.UpdateUserAsync(user);
+            return await userStoreProxy.UpdateUserAsync(user, cancellationToken);
         }
         private IUserStore GetUserStoreProxy(string userId)
         {
