@@ -27,7 +27,8 @@ namespace Fulfillment.Controllers
         {
             try
             {
-                var users = await this.fulfillment.GetUsersAsync();
+                var ct = new CancellationTokenSource(TimeSpan.FromSeconds(15)).Token;
+                var users = await this.fulfillment.GetUsersAsync(ct);
                 return this.Json(users);
             }
             catch (FabricException)

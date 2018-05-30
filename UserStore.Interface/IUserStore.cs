@@ -14,9 +14,10 @@ namespace UserStore.Interface
         /// <remarks>
         /// V2 Remoting bug does not allow return types to be of none concrete types like IEnumerable<T>. https://github.com/Azure/service-fabric-issues/issues/735
         /// </remarks>
-        Task<List<User>> GetUsersAsync();
-        Task<string> AddUserAsync(User user, CancellationToken cancellation);
-        Task<bool> UpdateUserAsync(User user, CancellationToken cancellation);
-        Task<bool> DeleteUserAsync(string userId, CancellationToken cancellation);
+        Task<List<User>> GetUsersAsync(CancellationToken cancellationToken);
+        Task<string> AddUserAsync(User user, CancellationToken cancellationToken);
+        Task<bool> UpdateUsersAsync(List<User> users, CancellationToken cancellationToken);
+        Task<bool> UpdateUserAsync(User user, CancellationToken cancellationToken);
+        Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken);
     }
 }

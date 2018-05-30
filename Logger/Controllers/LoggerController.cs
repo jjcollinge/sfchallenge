@@ -39,13 +39,13 @@ namespace Logger.Controllers
             }
         }
 
-        // GET api/logger
-        [HttpGet]
-        public async Task<IActionResult> GetAsync([FromBody]Trade trade)
+        // GET api/logger/active
+        [Route("active")]
+        public async Task<IActionResult> GetAsync()
         {
             try
             {
-                var count = await this.logger.CountAsync();
+                var count = await this.logger.ActiveTradeCountAsync();
                 return this.Ok(count);
             }
             catch (FabricNotPrimaryException)
@@ -56,6 +56,16 @@ namespace Logger.Controllers
             {
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
+        }
+
+        // GET api/logger/done
+        [Route("done")]
+        [HttpGet]
+        public async Task<IActionResult> GetTradesAsync()
+        {
+            var ct = new CancellationTokenSource(TimeSpan.FromSeconds(15)).Token;
+            var count = await this.logger.LoggedTradeCountAsync(ct);
+            return this.Ok(count);
         }
     }
 }

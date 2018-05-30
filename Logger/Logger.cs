@@ -104,12 +104,17 @@ namespace Logger
             }
         }
 
-        public async Task<long> CountAsync()
+        public async Task<long> ActiveTradeCountAsync()
         {
             IReliableConcurrentQueue<Trade> trades =
              await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
 
             return trades.Count;
+        }
+
+        public async Task<long> LoggedTradeCountAsync(CancellationToken cancellationToken)
+        {
+            return await tradeLogger.CountAsync(cancellationToken);
         }
 
         protected override async Task RunAsync(CancellationToken cancellationToken)

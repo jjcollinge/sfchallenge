@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <Settings xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.microsoft.com/2011/01/fabric">
   <Section Name="DB">
-    <Parameter Name="MongoConnectionString" Value="" />
-    <Parameter Name="MongoEnableSSL" Value="" />
+    <Parameter Name="MongoConnectionString" Value="mongodb://jocollin:2RN7gAEdMyItPjhbfh5cPmfHUuhmufWu5phO9nXX0Uw9QO8seXsOHevRF4wT9BVWLLys4XVDGC7r8kBQmYGjHw==@jocollin.documents.azure.com:10255/?ssl=true&amp;replicaSet=globaldb" />
+    <Parameter Name="MongoEnableSSL" Value="true" />
   </Section>
 </Settings>

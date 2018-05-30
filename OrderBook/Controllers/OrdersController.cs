@@ -112,7 +112,10 @@ namespace OrderBook.Controllers
         {
             try
             {
-                // This allows load testing to target singleton and partitioned services
+                if (order == null)
+                {
+                    return this.BadRequest("Null or invalid order");
+                }
                 if (order.Pair != orderBook.PartitionName)
                 {
                     order.Pair = orderBook.PartitionName;
@@ -150,6 +153,10 @@ namespace OrderBook.Controllers
         {
             try
             {
+                if (order == null)
+                {
+                    return this.BadRequest("Null or invalid order");
+                }
                 if (order.Pair != orderBook.PartitionName)
                 {
                     order.Pair = orderBook.PartitionName;

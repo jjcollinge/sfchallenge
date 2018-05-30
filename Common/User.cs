@@ -55,6 +55,9 @@ namespace Common
         [DataMember(Name = "LatestTrades")]
         private string[] _LatestTrades;
 
+        [DataMember(Name = "TradeSequenceNumber")]
+        public long TradeSequenceNumber { get; set; }
+
         public ImmutableDictionary<string, double> CurrencyAmounts { get; private set; }
 
         public ImmutableQueue<string> LatestTrades { get; private set; }

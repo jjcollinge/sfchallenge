@@ -114,6 +114,23 @@ namespace Fulfillment
         }
 
         /// <summary>
+        /// Adds a users to the user store.
+        /// </summary>
+        /// <param name="user"></param>
+        /// <returns></returns>
+        public async Task AddUsersAsync(IEnumerable<UserRequestModel> userRequests, CancellationToken cancellationToken)
+        {
+            List<User> users = new List<User>();
+            foreach (var userRequest in userRequests)
+            {
+                Validation.ThrowIfNotValidUserRequest(userRequest);
+                users.Add(userRequest);
+            }
+            
+            await this.Users.UpdateUsersAsync(users, cancellationToken);
+        }
+
+        /// <summary>
         /// Updates a user in the user store.
         /// </summary>
         /// <param name="userRequest"></param>
@@ -139,9 +156,9 @@ namespace Fulfillment
         /// Gets all users from the user store.
         /// </summary>
         /// <returns></returns>
-        public async Task<IEnumerable<User>> GetUsersAsync()
+        public async Task<IEnumerable<User>> GetUsersAsync(CancellationToken cancellationToken)
         {
-            return await this.Users.GetUsersAsync();
+            return await this.Users.GetUsersAsync(cancellationToken);
         }
 
         /// <summary>
@@ -206,15 +223,19 @@ namespace Fulfillment
         /// <returns></returns>
         private async Task<bool> ExecuteTradeAsync(Trade trade, User seller, User buyer, CancellationToken cancellationToken)
         {
-            // This is not atomic - trades may be applied to one or both user
-            // and then the program could crash. Rather than worry about
-            // distributed transactions here, duplication is checked during
-            // validation.
             var newBuyer = UpdateBuyer(trade, buyer);
             var newSeller = UpdateSeller(trade, seller);
-            var buyerIsUpdated = await Users.UpdateUserAsync(newBuyer, cancellationToken);
-            var sellerIsUpdated = await Users.UpdateUserAsync(newSeller, cancellationToken);
-            return (buyerIsUpdated && sellerIsUpdated);
+            var updateUsers = new List<User> { newBuyer, newSeller };
+            try
+            {
+                await Users.UpdateUsersAsync(updateUsers, cancellationToken);
+            }
+            catch (AggregateException ex)
+            {
+                ServiceEventSource.Current.Message($"Failed to update users: {ex.Message}");
+                return false;
+            }
+            return true;
         }
 
         private static User UpdateSeller(Trade trade, User seller)
@@ -276,8 +297,6 @@ namespace Fulfillment
                             var seller = await Users.GetUserAsync(trade.Ask.UserId);
                             var buyer = await Users.GetUserAsync(trade.Bid.UserId);
 
-                            bool duplicateOrder = false;
-
                             // If the trade is invalid, we'll throw an exception
                             // and remove it from the queue. If there is a transient
                             // failure, we'll abort and put it back on the queue.
@@ -296,18 +315,20 @@ namespace Fulfillment
                             {
                                 ServiceEventSource.Current.Message($"Dropping bad trade with reason: {ex.Message}");
 
-                                await tx.CommitAsync(); // Removes invalid orders from queue (in a real system we would re-add the valid bid)
+                                await tx.CommitAsync(); // Removes invalid orders from queue (in a real system we would re-add the valid ask)
                                 continue;
                             }
                             catch (DuplicateAskException)
                             {
-                                duplicateOrder = true;
                                 ServiceEventSource.Current.Message($"Duplicate ask ${trade.Id}");
+
+                                trade = VoidTrade(trade);
                             }
                             catch (DuplicateBidException)
                             {
-                                duplicateOrder = true;
                                 ServiceEventSource.Current.Message($"Duplicate bid ${trade.Id}");
+
+                                trade = VoidTrade(trade);
                             }
 
                             try
@@ -320,10 +341,6 @@ namespace Fulfillment
                                 await BackOff(cancellationToken);
                                 continue;
                             }
-
-                            // If a duplicate order short cut the loop.
-                            // Reconcilation can happen on the backend.
-                            if (duplicateOrder) continue;  
 
                             var applied = await ExecuteTradeAsync(trade, seller, buyer, cancellationToken);
                             if (applied)
@@ -391,6 +408,13 @@ namespace Fulfillment
                     }
                 }
             }
+        }
+
+        private static Trade VoidTrade(Trade trade)
+        {
+            var voidOrder = new Order(trade.Ask.Pair, 0, 0.0);
+            trade = new Trade(trade.Id, trade.Ask, trade.Bid, voidOrder);
+            return trade;
         }
 
         /// <summary>

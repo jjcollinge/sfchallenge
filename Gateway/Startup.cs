@@ -94,6 +94,24 @@ namespace Gateway
                     }
                 }
 
+                if (IsLoggerServiceRequest(context))
+                {
+                    // Handle user or trade requests with/without parition
+                    string forwardingUrl = ForwardingUrl(context, "Logger");
+
+                    // All requests through the gateway will hit a single partition of the 
+                    // logger service. This is because we only use it to query the DB count.
+                    var partitionedEndpoint = new Uri($"{forwardingUrl}?PartitionKey=1&PartitionKind=Int64Range");
+                    using (var requestMessage = context.CreateProxyHttpRequest(partitionedEndpoint))
+                    {
+                        using (var responseMessage = await context.SendProxyHttpRequest(requestMessage))
+                        {
+                            await context.CopyProxyHttpResponse(responseMessage);
+                            return;
+                        }
+                    }
+                }
+
                 throw new InvalidOperationException("Unexpected request body. This gateway only proxies for Fulfillment or OrderBook services");
 
             });
@@ -172,6 +190,11 @@ namespace Gateway
         private static bool IsFulfilmentServiceRequest(HttpContext context)
         {
             return context.Request.Path.Value.Contains("/api/user") || context.Request.Path.Value.Contains("/api/trades");
+        }
+
+        private bool IsLoggerServiceRequest(HttpContext context)
+        {
+            return context.Request.Path.Value.Contains("api/logger");
         }
 
         private static string ForwardingUrl(HttpContext context, string serviceName)

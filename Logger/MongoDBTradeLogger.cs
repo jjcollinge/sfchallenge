@@ -66,5 +66,10 @@ namespace Logger
         {
             await collection.Database.DropCollectionAsync(collection.CollectionNamespace.CollectionName, cancellationToken);
         }
+
+        public async Task<long> CountAsync(CancellationToken cancellationToken)
+        {
+            return await collection.CountAsync(new BsonDocument());
+        }
     }
 }

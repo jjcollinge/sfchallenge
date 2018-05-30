@@ -143,7 +143,7 @@
     </Service>
     <Service Name="UserStore" ServicePackageActivationMode="ExclusiveProcess">
       <StatefulService ServiceTypeName="UserStoreType" TargetReplicaSetSize="[UserStore_TargetReplicaSetSize]" MinReplicaSetSize="[UserStore_MinReplicaSetSize]">
-        <UniformInt64Partition PartitionCount="[UserStore_PartitionCount]" LowKey="-9223372036854775808" HighKey="9223372036854775807" />
+        <SingletonPartition />
       </StatefulService>
     </Service>
     <!-- Create Fulfillment Service -->

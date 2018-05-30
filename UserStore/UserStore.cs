@@ -72,13 +72,10 @@ namespace UserStore
             return user;
         }
 
-        public async Task<List<User>> GetUsersAsync()
+        public async Task<List<User>> GetUsersAsync(CancellationToken cancellationToken)
         {
             IReliableDictionary<string, User> users =
                await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
-
-            var maxExecutionTime = TimeSpan.FromSeconds(30D); // Stop retrieving users after 30 sec
-            var cancellationToken = new CancellationTokenSource(maxExecutionTime).Token;
 
             var returnList = new List<User>();
 
@@ -140,6 +137,52 @@ namespace UserStore
                     "Encounted errors while trying to add user",
                     exceptions);
             return string.Empty; // no-op
+        }
+
+        public async Task<bool> UpdateUsersAsync(List<User> userList, CancellationToken cancellationToken)
+        {
+            IReliableDictionary<string, User> users =
+              await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
+
+            var executed = false;
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (!executed && retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    using (var tx = this.StateManager.CreateTransaction())
+                    {
+                        foreach (var user in userList)
+                        {
+                            await ExecuteUpdateUserTransactionalAsync(tx, user, users, cancellationToken);
+
+                            MetricsLog?.UserUpdated(user);
+                        }
+                        await tx.CommitAsync();
+                    }
+                    executed = true;
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add user",
+                    exceptions);
+            return executed; // no-op
         }
 
         private async Task<string> ExecuteAddUserAsync(User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
@@ -216,6 +259,19 @@ namespace UserStore
                 }
             }
             return result;
+        }
+
+        private async Task ExecuteUpdateUserTransactionalAsync(ITransaction tx, User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
+        {
+            var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
+            if (current.HasValue)
+            {
+                await users.TryUpdateAsync(tx, user.Id, user, current.Value, TimeSpan.FromSeconds(15), cancellationToken);
+            }
+            else
+            {
+                throw new ApplicationException($"Cannot update non existent user '{user.Id}'");
+            }
         }
 
         public async Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken)
