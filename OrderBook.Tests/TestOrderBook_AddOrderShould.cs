@@ -50,7 +50,7 @@ namespace OrderBook.Tests
             {
                 try
                 {
-                    for (int i = 0; i < 1000; i++)
+                    for (int i = 0; i < 5000; i++)
                     {
                         var ask = new Order("buyer", CurrencyPair.GBPUSD, 100, 30);
                         await service.AddAskAsync(ask);

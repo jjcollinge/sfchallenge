@@ -38,6 +38,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gateway", "Gateway\Gateway.
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{21396D5F-851F-45EE-87B3-3C5F42D0091D}"
 	ProjectSection(SolutionItems) = preProject
+		Scripts\create-orders-parallel.ps1 = Scripts\create-orders-parallel.ps1
 		Scripts\create-orders.ps1 = Scripts\create-orders.ps1
 		Scripts\LoadTestDefinition.json = Scripts\LoadTestDefinition.json
 	EndProjectSection

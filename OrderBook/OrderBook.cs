@@ -113,7 +113,7 @@ namespace OrderBook
         public async Task<string> AddAskAsync(Order order)
         {
             Validation.ThrowIfNotValidOrder(order);
-            var currentAsks = asks.SecondaryIndex.Count;
+            var currentAsks = await asks.CountAsync();
 
             // You have an SLA with management to not allow orders when a backlog of more than 200 are pending
             // Changing this value with fail a system audit. Other approaches much be used to scale.
@@ -138,7 +138,7 @@ namespace OrderBook
         public async Task<string> AddBidAsync(Order order)
         {
             Validation.ThrowIfNotValidOrder(order);
-            var currentBids = bids.SecondaryIndex.Count;
+            var currentBids = await asks.CountAsync();
 
             // You have an SLA with management to not allow orders when a backlog of more than 200 are pending
             // Changing this value with fail a system audit. Other approaches much be used to scale.
