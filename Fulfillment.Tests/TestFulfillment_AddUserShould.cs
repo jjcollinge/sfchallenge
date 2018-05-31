@@ -1,5 +1,6 @@
 ﻿using Common;
 using ServiceFabric.Mocks;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -14,17 +15,14 @@ namespace Fulfillment.Tests
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
 
-            var qty = (uint)100;
-            var balance = (uint)100;
             var username = "  ";
             var request = new UserRequestModel
             {
-                Quantity = qty,
-                Balance = balance,
+                CurrencyAmounts = null,
                 Username = username,
             };
 
-            await Assert.ThrowsAsync<InvalidTradeRequestException>(() => service.AddUserAsync(request));
+            await Assert.ThrowsAsync<InvalidUserRequestException>(() => service.AddUserAsync(request, CancellationToken.None));
         }
     }
 }

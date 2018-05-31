@@ -30,18 +30,18 @@
     You have an SLA with management to block new trades when 800 existing trades are pending
     Changing this value with fail a system audit. Other approaches much be used to scale 
     -->
-    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="700" />
+    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="800" />
     <!-- OrderBook parameters -->
     <Parameter Name="OrderBook_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="OrderBook_PartitionCount" DefaultValue="1" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" DefaultValue="3" />
     <Parameter Name="OrderBook_Port" DefaultValue="9081" />
     <!--
-    You have an SLA with management to block new orders when 200 existing orders are pending
+    You have an SLA with management to block new orders when 700 existing orders are pending
     Changing this value with fail a system audit. Other approaches much be used to scale 
     -->
-    <Parameter Name="OrderBook_MaxBidsPending" DefaultValue="130" />
-    <Parameter Name="OrderBook_MaxAsksPending" DefaultValue="130" />
+    <Parameter Name="OrderBook_MaxBidsPending" DefaultValue="700" />
+    <Parameter Name="OrderBook_MaxAsksPending" DefaultValue="700" />
   </Parameters>
   <!-- Import Service Manifests -->
   <ServiceManifestImport>
@@ -143,7 +143,7 @@
     </Service>
     <Service Name="UserStore" ServicePackageActivationMode="ExclusiveProcess">
       <StatefulService ServiceTypeName="UserStoreType" TargetReplicaSetSize="[UserStore_TargetReplicaSetSize]" MinReplicaSetSize="[UserStore_MinReplicaSetSize]">
-        <UniformInt64Partition PartitionCount="[UserStore_PartitionCount]" LowKey="-9223372036854775808" HighKey="9223372036854775807" />
+        <SingletonPartition />
       </StatefulService>
     </Service>
     <!-- Create Fulfillment Service -->

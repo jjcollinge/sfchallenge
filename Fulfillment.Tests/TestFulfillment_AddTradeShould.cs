@@ -20,16 +20,18 @@ namespace Fulfillment.Tests
             var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
-            var ask = new Order(10, 10, "user1");
-            var bid = new Order(10, 10, "user2");
+            var ask = new Order("user1", CurrencyPair.GBPUSD, 10, 10);
+            var bid = new Order("user2", CurrencyPair.GBPUSD, 10, 10);
+            var settlement = new Order(ask.Pair, bid.Amount, ask.Price);
             var request = new TradeRequestModel
             {
                 Ask = ask,
                 Bid = bid,
+                Settlement = settlement
             };
 
             var tradeId = await service.AddTradeAsync(request);
-            var expected = new Trade(tradeId, ask, bid);
+            var expected = new Trade(tradeId, ask, bid, settlement);
 
             var queue = await stateManager.TryGetAsync<IReliableConcurrentQueue<Trade>>(Fulfillment.TradeQueueName);
             var actual = (await queue.Value.TryDequeueAsync(new MockTransaction(stateManager, 1))).Value;
@@ -42,12 +44,14 @@ namespace Fulfillment.Tests
             var context = Helpers.GetMockContext();
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
-            var ask = new Order(10, 10, "user1");
-            var bid = new Order(10, 10, "user2");
+            var ask = new Order("user1", CurrencyPair.GBPUSD, 10, 10);
+            var bid = new Order("user2", CurrencyPair.GBPUSD, 10, 10);
+            var settlement = new Order(ask.Pair, bid.Amount, ask.Price);
             var request = new TradeRequestModel
             {
                 Ask = ask,
                 Bid = bid,
+                Settlement = settlement
             };
             await Assert.ThrowsAsync<MaxPendingTradesExceededException>(async () =>
             {
@@ -65,8 +69,8 @@ namespace Fulfillment.Tests
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
 
-            var ask = new Order(10, 10, "user1");
-            var bid = new Order(10, 100, "user2");
+            var ask = new Order("user1", CurrencyPair.GBPUSD, 5, 10);
+            var bid = new Order("user2", CurrencyPair.GBPUSD, 100, 10);
             var request = new TradeRequestModel
             {
                 Ask = ask,
@@ -83,12 +87,14 @@ namespace Fulfillment.Tests
             var stateManager = new MockReliableStateManager();
             var service = new Fulfillment(context, stateManager);
 
-            var ask = new Order(60, 100, "user1");
-            var bid = new Order(40, 100, "user2");
+            var ask = new Order("user1", CurrencyPair.GBPUSD, 40, 150);
+            var bid = new Order("user2", CurrencyPair.GBPUSD, 40, 100);
+            var settlement = new Order(ask.Pair, bid.Amount, ask.Price);
             var request = new TradeRequestModel
             {
                 Ask = ask,
                 Bid = bid,
+                Settlement = settlement
             };
 
             await Assert.ThrowsAsync<InvalidTradeRequestException>(() => service.AddTradeAsync(request));

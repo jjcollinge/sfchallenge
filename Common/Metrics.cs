@@ -10,6 +10,7 @@ namespace Common
     public class Metrics
     {
         private readonly TelemetryClient _tc;
+        private readonly string _teamName;
 
         public Metrics(string instrumentationKey, string teamName)
         {
@@ -17,7 +18,8 @@ namespace Common
             {
                 InstrumentationKey = instrumentationKey
             };
-            _tc.Context.Cloud.RoleInstance = teamName;
+            _tc.Context.User.Id = teamName;
+            _teamName = teamName;
         }
 
         #region Fulfillment Metrics
@@ -34,10 +36,11 @@ namespace Common
                 { "BidUserId", trade.Bid.UserId },
                 { "TradeId", trade.Id },
                 { "Status", status.ToString("D") },
+                { "TeamName", _teamName }
             };
             var metrics = new Dictionary<string, double>() {
-                { "Spread", trade.Ask.Value - trade.Bid.Value },
-                { "Volume", trade.Bid.Quantity },
+                { "Spread", trade.Ask.Price - trade.Bid.Price },
+                { "Volume", trade.Bid.Amount },
             };
             _tc.TrackEvent("Trade completed", properties, metrics);
         }
@@ -46,20 +49,26 @@ namespace Common
         #region OrderBook Metrics
         public void BidCreated(Order order)
         {
-            var properties = new Dictionary<string, string>() { { "userId", order.UserId } };
+            var properties = new Dictionary<string, string>() {
+                { "userId", order.UserId },
+                { "TeamName", _teamName }
+            };
             var metrics = new Dictionary<string, double>() {
-                { "Quantity", order.Quantity },
-                { "Value", order.Value },
+                { "Amount", order.Amount },
+                { "Price", order.Price },
             };
             _tc.TrackEvent("Bid added", properties, metrics);
         }
 
         public void AskCreated(Order order)
         {
-            var properties = new Dictionary<string, string>() { { "userId", order.UserId } };
+            var properties = new Dictionary<string, string>() {
+                { "userId", order.UserId },
+                { "TeamName", _teamName }
+            };
             var metrics = new Dictionary<string, double>() {
-                { "Quantity", order.Quantity },
-                { "Value", order.Value },
+                { "Amount", order.Amount },
+                { "Price", order.Price },
             };
             _tc.TrackEvent("Ask added", properties, metrics);
         }
@@ -68,13 +77,14 @@ namespace Common
         {
             var properties = new Dictionary<string, string>() {
                 { "BidUserId", bid.UserId },
-                { "AskUserId", ask.UserId }
+                { "AskUserId", ask.UserId },
+                { "TeamName", _teamName }
             };
             var metrics = new Dictionary<string, double>() {
-                { "BidQuantity", bid.Quantity },
-                { "BidValue", bid.Value },
-                { "AskQuantity", ask.Quantity },
-                { "AskValue", ask.Value },
+                { "BidAmount", bid.Amount },
+                { "BidPrice", bid.Price },
+                { "AskAmount", ask.Amount },
+                { "AskPrice", ask.Price },
             };
             _tc.TrackEvent("New order match", properties, metrics);
         }
@@ -83,13 +93,19 @@ namespace Common
         #region UserStore Metrics
         public void UserCreated(User user)
         {
-            var properties = new Dictionary<string, string>() { { "userId", user.Id } };
+            var properties = new Dictionary<string, string>() {
+                { "userId", user.Id },
+                { "TeamName", _teamName }
+            };
             _tc.TrackEvent("User Created", properties);
         }
 
         public void UserUpdated(User user)
         {
-            var properties = new Dictionary<string, string>() { { "userId", user.Id } };
+            var properties = new Dictionary<string, string>() {
+                { "userId", user.Id },
+                { "TeamName", _teamName }
+            };
             _tc.TrackEvent("User updated", properties);
         }
 

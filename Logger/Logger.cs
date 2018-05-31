@@ -40,54 +40,89 @@ namespace Logger
         public Logger(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
-            Init();
         }
 
+        /// <summary>
+        /// Init setups in any configuration values
+        /// </summary>
         private void Init()
         {
             ConfigurationPackage configPackage = this.Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
             String connectionString = configPackage.Settings.Sections["DB"].Parameters["MongoConnectionString"].Value;
             bool.TryParse(configPackage.Settings.Sections["DB"].Parameters["MongoEnableSSL"].Value, out var enableSsl);
-            tradeLogger = MongoDBTradeLogger.Create(connectionString, enableSsl, databaseName, collectionName);
+            try
+            {
+                tradeLogger = MongoDBTradeLogger.Create(connectionString, enableSsl, databaseName, collectionName);
+            }
+            catch(Exception ex)
+            {
+                ServiceEventSource.Current.ServiceMessage(this.Context, $"Error initializing connection to logger ${ex.Message}");
+                BackOff(CancellationToken.None).GetAwaiter().GetResult();
+                Init();
+            }
         }
 
-        public async Task LogAsync(Trade trade)
+        /// <summary>
+        /// Adds a trade to the trade log
+        /// </summary>
+        /// <param name="trade"></param>
+        /// <returns></returns>
+        public async Task LogAsync(Trade trade, CancellationToken cancellationToken)
         {
-            IReliableConcurrentQueue<Trade> exportQueue =
+            IReliableConcurrentQueue<Trade> trades =
              await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
 
+            var executed = false;
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (!executed && retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    await executeAddTradeAsync(trade, trades, cancellationToken);
+                    executed = true;
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add trade",
+                    exceptions);
+        }
+
+        private async Task executeAddTradeAsync(Trade trade, IReliableConcurrentQueue<Trade> exportQueue, CancellationToken cancellationToken)
+        {
             using (var tx = this.StateManager.CreateTransaction())
             {
-                // Add trade to log queue
-                //logReceivedEvent.Set();
-                await exportQueue.EnqueueAsync(tx, trade);
+                await exportQueue.EnqueueAsync(tx, trade, cancellationToken);
                 await tx.CommitAsync();
             }
         }
 
-        public async Task ClearAsync()
+        public async Task<long> ActiveTradeCountAsync()
         {
-            IReliableConcurrentQueue<Trade> exportQueue =
+            IReliableConcurrentQueue<Trade> trades =
              await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
 
-            using (var tx = this.StateManager.CreateTransaction())
-            {
-                // Clear the external log trade store
-                await tradeLogger.ClearAsync(CancellationToken.None);
+            return trades.Count;
+        }
 
-                // Clear the queue
-                var t = Task.Run(async () =>
-                {
-                    while (exportQueue.Count > 0)
-                    {
-                        await exportQueue.TryDequeueAsync(tx);
-                    }
-                    await tx.CommitAsync();
-                    return true;
-                });
-                var timeout = Task.Delay(TimeSpan.FromSeconds(30));
-                await Task.WhenAny(t, timeout);
-            }
+        public async Task<long> LoggedTradeCountAsync(CancellationToken cancellationToken)
+        {
+            return await tradeLogger.CountAsync(cancellationToken);
         }
 
         protected override async Task RunAsync(CancellationToken cancellationToken)
@@ -130,10 +165,16 @@ namespace Logger
                         if (result.HasValue)
                         {
                             var trade = result.Value;
-
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Writing trade {trade.Id} to log");
-                            await tradeLogger.InsertAsync(trade, cancellationToken);
-                            await tx.CommitAsync();
+                            if (trade != null)
+                            {
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Writing trade {trade.Id} to log");
+                                if (tradeLogger == null)
+                                {
+                                    Init();
+                                }
+                                await tradeLogger?.InsertAsync(trade, cancellationToken);
+                                await tx.CommitAsync();
+                            }
                         }
                     }
                     catch (LoggerDisconnectedException)
@@ -141,7 +182,7 @@ namespace Logger
                         // Logger may have lost connection
                         // Back off and retry connection
                         await BackOff(cancellationToken);
-                        Init();
+                        Init(); // reinitialize connection
                         continue;
                     }
                     catch (FabricNotPrimaryException)
@@ -162,7 +203,7 @@ namespace Logger
                     {
                         // Insert failed, assume connection problem and transient.
                         // backoff and retry
-                        ServiceEventSource.Current.ServiceMessage(this.Context, ex.Message);
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Logger error,  {ex.Message}");
                         await BackOff(cancellationToken);
                         continue;
                     }
@@ -170,6 +211,11 @@ namespace Logger
             }
         }
 
+        /// <summary>
+        /// BackOff will delay execution for n seconds
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         private static async Task BackOff(CancellationToken cancellationToken)
         {
             ServiceEventSource.Current.Message($"Logger is backing off for {backOffDurationInSec} seconds");

@@ -16,7 +16,6 @@ namespace OrderBook.Controllers
     [Route("api/[controller]")]
     public class OrdersController : Controller
     {
-        private static bool IsCoolingDown = false;
         private readonly OrderBook orderBook;
 
         public OrdersController(OrderBook orderBook)
@@ -24,6 +23,8 @@ namespace OrderBook.Controllers
             this.orderBook = orderBook;
         }
 
+
+        // GET api/orders
         [HttpGet]
         public async Task<IActionResult> GetAsync()
         {
@@ -35,6 +36,7 @@ namespace OrderBook.Controllers
                 var bidsCount = bids.Count;
                 var view = new OrderBookViewModel
                 {
+                    CurrencyPair = orderBook.PartitionName,
                     Asks = asks,
                     Bids = bids,
                     AsksCount = asksCount,
@@ -48,6 +50,7 @@ namespace OrderBook.Controllers
             }
         }
 
+        // DELETE api/orders
         [HttpDelete]
         public async Task<IActionResult> DeleteAsync()
         {
@@ -66,6 +69,7 @@ namespace OrderBook.Controllers
             }
         }
 
+        // GET api/orders/bids
         [Route("bids")]
         [HttpGet]
         public async Task<IActionResult> Bids()
@@ -85,6 +89,7 @@ namespace OrderBook.Controllers
             }
         }
 
+        // GET api/orders/asks
         [Route("asks")]
         [HttpGet]
         public async Task<IActionResult> Asks()
@@ -100,23 +105,25 @@ namespace OrderBook.Controllers
             }
         }
 
+        // POST api/orders/bid
         [Route("bid")]
         [HttpPost]
         public async Task<IActionResult> Bid([FromBody] OrderRequestModel order)
         {
-            if (IsCoolingDown)
-            {
-                ServiceEventSource.Current.ServiceMaxPendingCooldown();
-                await Task.Delay(1200);
-                return new StatusCodeResult(429);
-            }
-
             try
             {
+                if (order == null)
+                {
+                    return this.BadRequest("Null or invalid order");
+                }
+                if (order.Pair != orderBook.PartitionName)
+                {
+                    order.Pair = orderBook.PartitionName;
+                }
                 var orderId = await this.orderBook.AddBidAsync(order);
                 return this.Ok(orderId);
             }
-            catch (InvalidAskException ex)
+            catch (InvalidBidException ex)
             {
                 ServiceEventSource.Current.ServiceException(orderBook.Context, "Invalid ask", ex);
                 return new ContentResult { StatusCode = 400, Content = ex.Message };
@@ -133,38 +140,27 @@ namespace OrderBook.Controllers
 
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
-            catch (MaxOrdersExceededException)
+            catch (MaxOrdersExceededException ex)
             {
-                if (!IsCoolingDown)
-                {
-                    try
-                    {
-                        IsCoolingDown = false;
-                        await Task.Delay(TimeSpan.FromSeconds(3));
-                    }
-                    finally
-                    {
-                        IsCoolingDown = true;
-                    }
-                }
-                return new StatusCodeResult(429);
-
+                return new ContentResult { StatusCode = 429, Content = $"{ex.Message}" };
             }
         }
 
+        // POST api/orders/ask
         [Route("ask")]
         [HttpPost]
         public async Task<IActionResult> Ask([FromBody] OrderRequestModel order)
         {
-            if (IsCoolingDown)
-            {
-                ServiceEventSource.Current.ServiceMaxPendingCooldown();
-                await Task.Delay(1200);
-                return new StatusCodeResult(429);
-            }
-
             try
             {
+                if (order == null)
+                {
+                    return this.BadRequest("Null or invalid order");
+                }
+                if (order.Pair != orderBook.PartitionName)
+                {
+                    order.Pair = orderBook.PartitionName;
+                }
                 var orderId = await this.orderBook.AddAskAsync(order);
                 return this.Ok(orderId);
             }
@@ -185,21 +181,9 @@ namespace OrderBook.Controllers
 
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
-            catch (MaxOrdersExceededException)
+            catch (MaxOrdersExceededException ex)
             {
-                if (!IsCoolingDown)
-                {
-                    try
-                    {
-                        IsCoolingDown = false;
-                        await Task.Delay(TimeSpan.FromSeconds(3));
-                    }
-                    finally
-                    {
-                        IsCoolingDown = true;
-                    }
-                }
-                return new StatusCodeResult(429);
+                return new ContentResult { StatusCode = 429, Content = $"{ex.Message}" };
             }
         }
     }

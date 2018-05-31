@@ -2,6 +2,7 @@
 using Microsoft.ServiceFabric.Data.Collections;
 using ServiceFabric.Mocks;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -16,13 +17,16 @@ namespace UserStore.Tests
             var stateManager = new MockReliableStateManager();
             var service = new UserStore(context, stateManager);
 
-            var sutUser = new User("42", "Anders", 42, 128, new List<string>()
+
+            var currencyAmounts = new Dictionary<string, double>();
+            currencyAmounts.Add(CurrencyPair.GBPUSD.GetBuyerWantCurrency(), 21);
+            var sutUser = new User("42", "Anders", currencyAmounts, new List<string>()
                 {
                     "t1"
                 });
 
             //create state
-            await service.AddUserAsync(sutUser);
+            await service.AddUserAsync(sutUser, CancellationToken.None);
 
             //get state
             var dictionary = await stateManager.TryGetAsync<IReliableDictionary<string, User>>(UserStore.StateManagerKey);

@@ -14,7 +14,7 @@ using Microsoft.ServiceFabric.Data;
 namespace UserStore
 {
     /// <summary>
-    /// A statefull service, used to store Users. Access via binary remoting based on the V2 Remoting stack
+    /// A stateful service, used to store Users. Access via binary remoting based on the V2 Remoting stack
     /// </summary>
     public sealed class UserStore : StatefulService, IUserStore
     {
@@ -29,7 +29,6 @@ namespace UserStore
         public UserStore(StatefulServiceContext context, IReliableStateManagerReplica2 reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
-            Init();
         }
 
         private void Init()
@@ -55,31 +54,47 @@ namespace UserStore
             return this.CreateServiceRemotingReplicaListeners();
         }
 
-        public async Task<User> GetUserAsync(string userId)
+        public async Task<User> GetUserAsync(string userId, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, User> users =
                await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
 
-            User user = null;
-            using (var tx = this.StateManager.CreateTransaction())
+            var executed = false;
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (!executed && retryCount < 3)
             {
-                var tryUser = await users.TryGetValueAsync(tx, userId);
-                if (tryUser.HasValue)
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
                 {
-                    user = tryUser.Value;
+                    return await ExecuteGetUserAsync(userId, users, cancellationToken);
                 }
-                await tx.CommitAsync();
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
             }
-            return user;
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to get user",
+                    exceptions);
+            return null; // no-op
+            
         }
 
-        public async Task<List<User>> GetUsersAsync()
+        public async Task<List<User>> GetUsersAsync(CancellationToken cancellationToken)
         {
             IReliableDictionary<string, User> users =
                await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
-
-            var maxExecutionTime = TimeSpan.FromSeconds(30D); // Stop retrieving users after 30 sec
-            var cancellationToken = new CancellationTokenSource(maxExecutionTime).Token;
 
             var returnList = new List<User>();
 
@@ -105,66 +120,237 @@ namespace UserStore
             return returnList;
         }
 
-        public async Task<string> AddUserAsync(User user)
+        public async Task<string> AddUserAsync(User user, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, User> users =
               await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
 
+            var executed = false;
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (!executed && retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    var userId = await ExecuteAddUserAsync(user, users, cancellationToken);
+                    executed = true;
+                    return userId;
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add user",
+                    exceptions);
+            return string.Empty; // no-op
+        }
+
+        public async Task<bool> UpdateUsersAsync(List<User> userList, CancellationToken cancellationToken)
+        {
+            IReliableDictionary<string, User> users =
+              await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
+
+            var executed = false;
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (!executed && retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    using (var tx = this.StateManager.CreateTransaction())
+                    {
+                        foreach (var user in userList)
+                        {
+                            await ExecuteUpdateUserTransactionalAsync(tx, user, users, cancellationToken);
+
+                            MetricsLog?.UserUpdated(user);
+                        }
+                        await tx.CommitAsync();
+                    }
+                    executed = true;
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add user",
+                    exceptions);
+            return executed; // no-op
+        }
+
+        public async Task<bool> UpdateUserAsync(User user, CancellationToken cancellationToken)
+        {
+            IReliableDictionary<string, User> users =
+              await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
+
+            var executed = false;
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (!executed && retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    var userId = await ExecuteUpdateUserAsync(user, users, cancellationToken);
+                    executed = true;
+                    return userId;
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to update user",
+                    exceptions);
+            return false; // no-op
+        }
+
+        public async Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken)
+        {
+            IReliableDictionary<string, User> users =
+              await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
+
+            var executed = false;
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (!executed && retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    var deleted = await ExecuteDeleteUserAsync(userId, users, cancellationToken);
+                    executed = true;
+                    return deleted;
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add user",
+                    exceptions);
+            return false; // no-op
+        }
+
+        private async Task<string> ExecuteAddUserAsync(User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
+        {
+            using (var tx = this.StateManager.CreateTransaction())
+            {
+                var current = await users.TryGetValueAsync(tx, user.Id);
+                if (current.HasValue)
+                {
+                    return user.Id; // Return existing user
+                }
+                await users.AddAsync(tx, user.Id, user, TimeSpan.FromSeconds(15), cancellationToken);
+                await tx.CommitAsync();
+
+                MetricsLog?.UserCreated(user);
+            }
+            return user.Id;
+        }
+
+        private async Task<bool> ExecuteUpdateUserAsync(User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
+        {
+            bool result;
             using (var tx = this.StateManager.CreateTransaction())
             {
                 var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
                 if (current.HasValue)
                 {
-                    await ExecuteUserUpdate(user, users, tx);
-                    return user.Id;
+                    result = await users.TryUpdateAsync(tx, user.Id, user, current.Value, TimeSpan.FromSeconds(15), cancellationToken);
+                    await tx.CommitAsync();
+
+                    MetricsLog?.UserUpdated(user);
                 }
-                await users.AddAsync(tx, user.Id, user);
-                await tx.CommitAsync();
-
-                MetricsLog.UserCreated(user);
+                else
+                {
+                    throw new ApplicationException($"Cannot update non existent user '{user.Id}'");
+                }
             }
-            return user.Id;
+            return result;
         }
 
-        public async Task<bool> UpdateUserAsync(User user)
+        private async Task ExecuteUpdateUserTransactionalAsync(ITransaction tx, User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
         {
-            IReliableDictionary<string, User> users =
-              await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
-
-            using (var tx = this.StateManager.CreateTransaction())
-            {
-                return await ExecuteUserUpdate(user, users, tx);
-            }
-        }
-
-        private async Task<bool> ExecuteUserUpdate(User user, IReliableDictionary<string, User> users, ITransaction tx)
-        {
-            bool result;
             var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
             if (current.HasValue)
             {
-                result = await users.TryUpdateAsync(tx, user.Id, user, current.Value);
-                await tx.CommitAsync();
-
-                MetricsLog.UserUpdated(user);
+                await users.TryUpdateAsync(tx, user.Id, user, current.Value, TimeSpan.FromSeconds(15), cancellationToken);
             }
             else
             {
                 throw new ApplicationException($"Cannot update non existent user '{user.Id}'");
             }
-
-            return result;
         }
 
-        public async Task<bool> DeleteUserAsync(string userId)
+        private async Task<User> ExecuteGetUserAsync(string userId, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
         {
-            IReliableDictionary<string, User> users =
-              await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
+            User user = null;
+            using (var tx = this.StateManager.CreateTransaction())
+            {
+                var tryUser = await users.TryGetValueAsync(tx, userId, LockMode.Default, TimeSpan.FromSeconds(15), cancellationToken);
+                if (tryUser.HasValue)
+                {
+                    user = tryUser.Value;
+                }
+                await tx.CommitAsync();
+            }
+            return user;
+        }
 
+        private async Task<bool> ExecuteDeleteUserAsync(string userId, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
+        {
             bool removed;
             using (var tx = this.StateManager.CreateTransaction())
             {
-                var result = await users.TryRemoveAsync(tx, userId);
+                var result = await users.TryRemoveAsync(tx, userId, TimeSpan.FromSeconds(15), cancellationToken);
                 if (result.HasValue)
                 {
                     removed = true;

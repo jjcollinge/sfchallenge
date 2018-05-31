@@ -155,17 +155,10 @@ namespace Fulfillment
         }
 
         private const int MaxPendingLimitReached = 7;
-        [Event(MaxPendingLimitReached, Level = EventLevel.Critical, Message = "Max pending limit reached! Consider partitioning further")]
+        [Event(MaxPendingLimitReached, Level = EventLevel.Critical, Message = "Max number of pending trades in the Fulfillment queue hit, please optimize further.")]
         public void ServiceMaxPendingLimitHit()
         {
             WriteEvent(MaxPendingLimitReached);
-        }
-
-        private const int MaxPendingLimitCooldown = 8;
-        [Event(MaxPendingLimitCooldown, Level = EventLevel.Critical, Message = "Cooling down after max pending limit reached! Consider partitioning further")]
-        public void ServiceMaxPendingCooldown()
-        {
-            WriteEvent(MaxPendingLimitCooldown);
         }
         #endregion
 

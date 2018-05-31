@@ -8,18 +8,19 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Common;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 
 namespace Gateway
 {
     public class Startup
     {
         private const string ForwarderForHeader = "X-Forwarded-Host";
-        private const string ItemTypeHeader = "x-item-type";
         public static HttpClient Client = new HttpClient();
 
         public void ConfigureServices(IServiceCollection services)
@@ -45,44 +46,62 @@ namespace Gateway
                     return;
                 }
 
-                //Complete a CPU intensive fraud check. 
+                // REQUIRED, DO NOT REMOVE.
                 FraudCheck.Check();
-
 
                 if (IsOrderBookServiceRequest(context))
                 {
                     PartitionScheme partitioningScheme = await GetOrderBookParititoiningScheme();
 
+                    var currency = GetAndRemoveCurrencyFromRequest(ref context);
                     if (partitioningScheme == PartitionScheme.Singleton)
                     {
-                        //Handle bid and ask requests without parition
+                        // Handle bid and ask requests without parition
                         string forwardingUrl = ForwardingUrl(context, "OrderBook");
                         await ProxyRequestHelper(context, forwardingUrl);
+                        
                         return;
                     }
 
-                    // If requests have a header of 'x-item-type' then redirect them to the correct partition 
-                    // using the 'Named' partition scheme in Service Fabric and it's Reverse proxy.
-                    // https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-reverseproxy
-                    var itemTypeExists = context.Request.Headers.TryGetValue(ItemTypeHeader, out var itemType);
-                    if (partitioningScheme == PartitionScheme.Named && itemTypeExists)
+                    if (partitioningScheme == PartitionScheme.Named && currency != string.Empty)
                     {
-                        //Handle bid and ask requests with parition
+                        // Handle bid and ask requests with paritions
                         string forwardingUrl = ForwardingUrl(context, "OrderBook");
-                        var partitionedEndpoint = $"{forwardingUrl}?PartitionKey={itemType.ToString()}&PartitionKind=Named";
+                        var partitionedEndpoint = $"{forwardingUrl}?PartitionKey={currency}&PartitionKind=Named&Timeout=20";
                         await ProxyRequestHelper(context, partitionedEndpoint);
                         return;
                     }
 
-                    throw new InvalidOperationException("Expected either Named of singleton partitioning scheme for the orderbook");
+                    throw new InvalidOperationException("OrderBook must use either singleton or named partition scheme");
                 }
 
                 if (IsFulfilmentServiceRequest(context))
                 {
-                    //Handle user or trade requests with/without parition
+                    // Handle user or trade requests with/without parition
                     string forwardingUrl = ForwardingUrl(context, "Fulfillment");
 
-                    var partitionedEndpoint = new Uri($"{forwardingUrl}?PartitionKey=1&PartitionKind=Int64Range");
+                    // All requests through the gateway will hit a single partition of the 
+                    // fulfillment service. This is because we only use it to create 
+                    // our test users.
+                    var partitionedEndpoint = new Uri($"{forwardingUrl}?PartitionKey=1&PartitionKind=Int64Range&Timeout=20");
+                    using (var requestMessage = context.CreateProxyHttpRequest(partitionedEndpoint))
+                    {
+                        using (var responseMessage = await context.SendProxyHttpRequest(requestMessage))
+                        {
+                            await context.CopyProxyHttpResponse(responseMessage);
+                            return;
+                        }
+                    }
+                }
+
+                if (IsLoggerServiceRequest(context))
+                {
+                    // Handle user or trade requests with/without parition
+                    string forwardingUrl = ForwardingUrl(context, "Logger");
+
+                    // All requests through the gateway will hit a single partition of the 
+                    // logger service. This is because we only use it to query the DB count.
+                    var partitionedEndpoint = new Uri($"{forwardingUrl}?PartitionKey=1&PartitionKind=Int64Range&Timeout=20");
                     using (var requestMessage = context.CreateProxyHttpRequest(partitionedEndpoint))
                     {
                         using (var responseMessage = await context.SendProxyHttpRequest(requestMessage))
@@ -117,6 +136,52 @@ namespace Gateway
             }
         }
 
+        private static async Task ProxyRequestHelperWithStringContent(HttpContext context, StringContent content, string forwardingUrl)
+        {
+            using (var requestMessage = context.CreateProxyHttpRequest(new Uri(forwardingUrl), content))
+            {
+                using (var responseMessage = await context.SendProxyHttpRequest(requestMessage))
+                {
+                    await context.CopyProxyHttpResponse(responseMessage);
+                }
+            }
+        }
+
+        private string GetAndRemoveCurrencyFromRequest(ref HttpContext context)
+        {
+            if (context.Request.Path.Value.Contains(CurrencyPairExtensions.GBPUSD_SYMBOL))
+            {
+                context.Request.Path = context.Request.Path.Value.Replace(CurrencyPairExtensions.GBPUSD_SYMBOL, "");
+                return CurrencyPairExtensions.GBPUSD_SYMBOL;
+            }
+            if (context.Request.Path.Value.Contains(CurrencyPairExtensions.GBPEUR_SYMBOL))
+            {
+                context.Request.Path = context.Request.Path.Value.Replace(CurrencyPairExtensions.GBPEUR_SYMBOL, "");
+                return CurrencyPairExtensions.GBPEUR_SYMBOL;
+            }
+            if (context.Request.Path.Value.Contains(CurrencyPairExtensions.USDGBP_SYMBOL))
+            {
+                context.Request.Path = context.Request.Path.Value.Replace(CurrencyPairExtensions.USDGBP_SYMBOL, "");
+                return CurrencyPairExtensions.USDGBP_SYMBOL;
+            }
+            if (context.Request.Path.Value.Contains(CurrencyPairExtensions.USDEUR_SYMBOL))
+            {
+                context.Request.Path = context.Request.Path.Value.Replace(CurrencyPairExtensions.USDEUR_SYMBOL, "");
+                return CurrencyPairExtensions.USDEUR_SYMBOL;
+            }
+            if (context.Request.Path.Value.Contains(CurrencyPairExtensions.EURGBP_SYMBOL))
+            {
+                context.Request.Path = context.Request.Path.Value.Replace(CurrencyPairExtensions.EURGBP_SYMBOL, "");
+                return CurrencyPairExtensions.EURGBP_SYMBOL;
+            }
+            if (context.Request.Path.Value.Contains(CurrencyPairExtensions.EURUSD_SYMBOL))
+            {
+                context.Request.Path = context.Request.Path.Value.Replace(CurrencyPairExtensions.EURUSD_SYMBOL, "");
+                return CurrencyPairExtensions.EURUSD_SYMBOL;
+            }
+            return CurrencyPairExtensions.GBPUSD_SYMBOL;
+        }
+
         private static bool IsOrderBookServiceRequest(HttpContext context)
         {
             return context.Request.Path.Value.Contains("api/orders");
@@ -125,6 +190,11 @@ namespace Gateway
         private static bool IsFulfilmentServiceRequest(HttpContext context)
         {
             return context.Request.Path.Value.Contains("/api/user") || context.Request.Path.Value.Contains("/api/trades");
+        }
+
+        private bool IsLoggerServiceRequest(HttpContext context)
+        {
+            return context.Request.Path.Value.Contains("api/logger");
         }
 
         private static string ForwardingUrl(HttpContext context, string serviceName)
@@ -142,14 +212,12 @@ namespace Gateway
             {
                 endpoint += context.Request.QueryString.Value;
             }
-
-            return endpoint;
+            return endpoint.TrimEnd('/'); ;
         }
     }
     public static class Extensions
     {
-
-        public static HttpRequestMessage CreateProxyHttpRequest(this HttpContext context, Uri uri)
+        public static HttpRequestMessage CreateProxyHttpRequest(this HttpContext context, Uri uri, StringContent content = null)
         {
             var request = context.Request;
 
@@ -160,13 +228,24 @@ namespace Gateway
                 !HttpMethods.IsDelete(requestMethod) &&
                 !HttpMethods.IsTrace(requestMethod))
             {
-                var streamContent = new StreamContent(request.Body);
-                requestMessage.Content = streamContent;
+                if (content == null)
+                {
+                    var streamContent = new StreamContent(request.Body);
+                    requestMessage.Content = streamContent;
+                }
+                else
+                {
+                    requestMessage.Content = content;
+                }
             }
 
             // Copy the request headers
             foreach (var header in request.Headers)
             {
+                if (header.Key.ToLower().Contains("content-length") && content != null)
+                {
+                    continue;
+                }
                 if (!requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()) && requestMessage.Content != null)
                 {
                     requestMessage.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());

@@ -12,7 +12,7 @@ namespace Fulfillment
         {
             if (string.IsNullOrWhiteSpace(user.Username))
             {
-                throw new InvalidTradeRequestException("Username cannot be null, empty or contain whitespace");
+                throw new InvalidUserRequestException("Username cannot be null, empty or contain whitespace");
             }
         }
 
@@ -22,13 +22,13 @@ namespace Fulfillment
             {
                 throw new InvalidTradeRequestException("Bid or ask cannot be null");
             }
-            if (trade.Ask.Value > trade.Bid.Value)
+            if (trade.Ask.Price > trade.Bid.Price)
             {
-                throw new InvalidTradeRequestException("The ask value cannot be higher than the bid value");
+                throw new InvalidTradeRequestException("The ask price cannot be higher than the bid price");
             }
-            if (trade.Ask.Quantity < trade.Bid.Quantity)
+            if (trade.Ask.Amount < trade.Bid.Amount)
             {
-                throw new InvalidTradeRequestException("The ask quantity cannot be lower than the bid quantity");
+                throw new InvalidTradeRequestException("The ask amount cannot be lower than the bid amount");
             }
         }
 
@@ -42,21 +42,25 @@ namespace Fulfillment
             {
                 throw new BadBuyerException($"Matched seller doesn't exist");
             }
-            if (seller.Quantity < trade.Bid.Quantity)
+            if (!seller.CurrencyAmounts.ToDictionary(x => x.Key, x => x.Value).ContainsKey(trade.Bid.Pair.GetBuyerWantCurrency()))
+            {
+                throw new BadSellerException($"Matched seller doesn't own any of the currency {trade.Bid.Pair.GetBuyerWantCurrency()} the buyer wants");
+            }
+            if (seller.CurrencyAmounts.ToDictionary(x => x.Key, x => x.Value)[trade.Bid.Pair.GetBuyerWantCurrency()] < trade.Settlement.Amount)
             {
                 throw new BadSellerException($"Matched seller '{seller.Id}' doesn't have suffient quantity to satisfy the trade");
             }
-            if (buyer.Balance < trade.Bid.Value)
+            if (buyer.CurrencyAmounts.ToDictionary(x => x.Key, x => x.Value)[trade.Bid.Pair.GetSellerWantCurrency()] < (trade.Bid.Amount * trade.Ask.Price))
             {
                 throw new BadBuyerException($"Matched buyer '{buyer.Id}' doesn't have suffient balance to satisfy the trade");
             }
-            if (buyer.TradeIds.Any(t => t.Split("_").LastOrDefault() == trade.Bid.Id))
+            if (buyer.LatestTrades.Any(t => t.Split("_").LastOrDefault() == trade.Bid.Id))
             {
-                throw new BadBuyerException("$The bid order has already been processed");
+                throw new DuplicateBidException("$The bid order has already been processed");
             }
-            if (seller.TradeIds.Any(t => t.Split("_").FirstOrDefault() == trade.Ask.Id))
+            if (seller.LatestTrades.Any(t => t.Split("_").FirstOrDefault() == trade.Ask.Id))
             {
-                throw new BadSellerException("$The ask order has already been processed");
+                throw new DuplicateAskException("$The ask order has already been processed");
             }
         }
     }

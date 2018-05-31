@@ -24,13 +24,13 @@ namespace OrderBook
             {
                 throw new InvalidOrderException("Order cannot have a null or invalid user id");
             }
-            if (order.Quantity == 0)
+            if (order.Amount == 0)
             {
-                throw new InvalidOrderException("Order cannot have 0 quantity");
+                throw new InvalidOrderException("Order cannot have 0 Amount");
             }
-            if (order.Value == 0)
+            if (order.Price == 0)
             {
-                throw new InvalidOrderException("Order cannot have 0 value");
+                throw new InvalidOrderException("Order cannot have 0 Price");
             }
         }
     }

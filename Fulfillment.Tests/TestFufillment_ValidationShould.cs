@@ -17,13 +17,19 @@ namespace Fulfillment.Tests
             var sellerId = "user1";
             var buyerId = "user2";
 
-            var seller = new User(sellerId, "seller", 100, 10, null);
-            var buyer = new User(buyerId, "buyer", 10, 100, null);
+            var sellerCurrencyAmounts = new Dictionary<string, double>();
+            sellerCurrencyAmounts.Add(CurrencyPair.GBPUSD.GetBuyerWantCurrency(), 100);
+            var seller = new User(sellerId, "seller", sellerCurrencyAmounts, null);
+
+            var buyerCurrencyAmounts = new Dictionary<string, double>();
+            buyerCurrencyAmounts.Add(CurrencyPair.GBPUSD.GetSellerWantCurrency(), 100);
+            var buyer = new User(buyerId, "buyer", buyerCurrencyAmounts, null);
 
             var tradeRequest = new TradeRequestModel();
-            tradeRequest.Ask = new Order(askId, 10, 10, sellerId, DateTime.UtcNow);
-            tradeRequest.Bid = new Order(bidId, 10, 10, buyerId, DateTime.UtcNow);
-           
+            tradeRequest.Ask = new Order(askId, sellerId, CurrencyPair.GBPUSD, 10, 10, DateTime.UtcNow);
+            tradeRequest.Bid = new Order(bidId, buyerId, CurrencyPair.GBPUSD, 10, 10, DateTime.UtcNow);
+            tradeRequest.Settlement = new Order(CurrencyPair.GBPUSD, 10, 10);
+
             Validation.ThrowIfNotValidTrade(tradeRequest, seller, buyer);
         }
 
@@ -37,15 +43,21 @@ namespace Fulfillment.Tests
             var buyerId = "user2";
             
             var tradeRequest = new TradeRequestModel();
-            tradeRequest.Ask = new Order(askId, 10, 10, sellerId, DateTime.UtcNow);
-            tradeRequest.Bid = new Order(bidId, 10, 10, buyerId, DateTime.UtcNow);
+            tradeRequest.Ask = new Order(askId, sellerId, CurrencyPair.GBPUSD, 10, 10, DateTime.UtcNow);
+            tradeRequest.Bid = new Order(bidId, buyerId, CurrencyPair.GBPUSD, 10, 10, DateTime.UtcNow);
+            tradeRequest.Settlement = new Order(CurrencyPair.GBPUSD, 10, 10);
 
             Trade trade = tradeRequest;
 
-            var seller = new User(sellerId, "seller", 100, 10, new List<string>() { trade.Id });
-            var buyer = new User(buyerId, "buyer", 10, 100, new List<string>() { trade.Id });
+            var sellerCurrencyAmounts = new Dictionary<string, double>();
+            sellerCurrencyAmounts.Add(CurrencyPair.GBPUSD.GetBuyerWantCurrency(), 100);
+            var seller = new User(sellerId, "seller", sellerCurrencyAmounts, new List<string>() { trade.Id });
 
-            Assert.Throws<BadBuyerException>(() => Validation.ThrowIfNotValidTrade(tradeRequest, seller, buyer));
+            var buyerCurrencyAmounts = new Dictionary<string, double>();
+            buyerCurrencyAmounts.Add(CurrencyPair.GBPUSD.GetSellerWantCurrency(), 100);
+            var buyer = new User(buyerId, "buyer", buyerCurrencyAmounts, new List<string>() { trade.Id });
+
+            Assert.Throws<DuplicateBidException>(() => Validation.ThrowIfNotValidTrade(tradeRequest, seller, buyer));
         }
 
         [Fact]
@@ -57,12 +69,15 @@ namespace Fulfillment.Tests
             var sellerId = "user1";
             var buyerId = "user2";
 
-            var seller = new User(sellerId, "seller", 100, 10, null);
+            var sellerCurrencyAmounts = new Dictionary<string, double>();
+            sellerCurrencyAmounts.Add(CurrencyPair.GBPUSD.GetBuyerWantCurrency(), 100);
+            var seller = new User(sellerId, "seller", sellerCurrencyAmounts, null);
             User buyer = null;
 
             var tradeRequest = new TradeRequestModel();
-            tradeRequest.Ask = new Order(askId, 10, 10, sellerId, DateTime.UtcNow);
-            tradeRequest.Bid = new Order(bidId, 10, 10, buyerId, DateTime.UtcNow);
+            tradeRequest.Ask = new Order(askId, sellerId, CurrencyPair.GBPUSD, 10, 10, DateTime.UtcNow);
+            tradeRequest.Bid = new Order(bidId, buyerId, CurrencyPair.GBPUSD, 10, 10, DateTime.UtcNow);
+            tradeRequest.Settlement = new Order(CurrencyPair.GBPUSD, 10, 10);
 
             Assert.Throws<BadBuyerException>(() => Validation.ThrowIfNotValidTrade(tradeRequest, seller, buyer));
         }
@@ -77,17 +92,20 @@ namespace Fulfillment.Tests
             var buyerId = "user2";
 
             User seller = null;
-            var buyer = new User(buyerId, "buyer", 10, 100, null);
+            var buyerCurrencyAmounts = new Dictionary<string, double>();
+            buyerCurrencyAmounts.Add(CurrencyPair.GBPUSD.GetSellerWantCurrency(), 100);
+            var buyer = new User(buyerId, "buyer", buyerCurrencyAmounts, null);
 
             var tradeRequest = new TradeRequestModel();
-            tradeRequest.Ask = new Order(askId, 10, 10, sellerId, DateTime.UtcNow);
-            tradeRequest.Bid = new Order(bidId, 10, 10, buyerId, DateTime.UtcNow);
+            tradeRequest.Ask = new Order(askId, sellerId, CurrencyPair.GBPUSD, 10, 10, DateTime.UtcNow);
+            tradeRequest.Bid = new Order(bidId, buyerId, CurrencyPair.GBPUSD, 10, 10, DateTime.UtcNow);
+            tradeRequest.Settlement = new Order(CurrencyPair.GBPUSD, 10, 10);
 
             Assert.Throws<BadSellerException>(() => Validation.ThrowIfNotValidTrade(tradeRequest, seller, buyer));
         }
 
         [Fact]
-        public void ThrowIfSellerQuantityLowerThanBidQuantity()
+        public void ThrowIfSellerAmountLowerThanBidAmount()
         {
             var askId = "ask1";
             var bidId = "bid1";
@@ -95,18 +113,24 @@ namespace Fulfillment.Tests
             var sellerId = "user1";
             var buyerId = "user2";
 
-            var seller = new User(sellerId, "seller", 5, 10, null);
-            var buyer = new User(buyerId, "buyer", 10, 100, null);
+            var sellerCurrencyAmounts = new Dictionary<string, double>();
+            sellerCurrencyAmounts.Add(CurrencyPair.GBPUSD.GetBuyerWantCurrency(), 5);
+            var seller = new User(sellerId, "seller", sellerCurrencyAmounts, null);
+
+            var buyerCurrencyAmounts = new Dictionary<string, double>();
+            buyerCurrencyAmounts.Add(CurrencyPair.GBPUSD.GetSellerWantCurrency(), 100);
+            var buyer = new User(buyerId, "buyer", buyerCurrencyAmounts, null);
 
             var tradeRequest = new TradeRequestModel();
-            tradeRequest.Ask = new Order(askId, 10, 10, sellerId, DateTime.UtcNow);
-            tradeRequest.Bid = new Order(bidId, 10, 10, buyerId, DateTime.UtcNow);
+            tradeRequest.Ask = new Order(askId, sellerId, CurrencyPair.GBPUSD, 100, 10, DateTime.UtcNow);
+            tradeRequest.Bid = new Order(bidId, buyerId, CurrencyPair.GBPUSD, 100, 10, DateTime.UtcNow);
+            tradeRequest.Settlement = new Order(CurrencyPair.GBPUSD, 10, 10);
 
             Assert.Throws<BadSellerException>(() => Validation.ThrowIfNotValidTrade(tradeRequest, seller, buyer));
         }
 
         [Fact]
-        public void ThrowIfBuyerBalanceLowerThanBidValue()
+        public void ThrowIfBuyerAmountLowerThanBidAmount()
         {
             var askId = "ask1";
             var bidId = "bid1";
@@ -114,12 +138,18 @@ namespace Fulfillment.Tests
             var sellerId = "user1";
             var buyerId = "user2";
 
-            var seller = new User(sellerId, "seller", 10, 10, null);
-            var buyer = new User(buyerId, "buyer", 10, 5, null);
+            var sellerCurrencyAmounts = new Dictionary<string, double>();
+            sellerCurrencyAmounts.Add(CurrencyPair.GBPUSD.GetBuyerWantCurrency(), 100);
+            var seller = new User(sellerId, "seller", sellerCurrencyAmounts, null);
+
+            var buyerCurrencyAmounts = new Dictionary<string, double>();
+            buyerCurrencyAmounts.Add(CurrencyPair.GBPUSD.GetSellerWantCurrency(), 5);
+            var buyer = new User(buyerId, "buyer", buyerCurrencyAmounts, null);
 
             var tradeRequest = new TradeRequestModel();
-            tradeRequest.Ask = new Order(askId, 10, 10, sellerId, DateTime.UtcNow);
-            tradeRequest.Bid = new Order(bidId, 10, 10, buyerId, DateTime.UtcNow);
+            tradeRequest.Ask = new Order(askId, sellerId, CurrencyPair.GBPUSD, 100, 10, DateTime.UtcNow);
+            tradeRequest.Bid = new Order(bidId, buyerId, CurrencyPair.GBPUSD, 100, 10, DateTime.UtcNow);
+            tradeRequest.Settlement = new Order(CurrencyPair.GBPUSD, 100, 10);
 
             Assert.Throws<BadBuyerException>(() => Validation.ThrowIfNotValidTrade(tradeRequest, seller, buyer));
         }

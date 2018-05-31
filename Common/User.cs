@@ -19,19 +19,28 @@ namespace Common
     [DataContract]
     public sealed class User : IEquatable<User>
     {
-        public User(string id, string username, uint quantity, uint balance, IEnumerable<string> tradeIds)
+        private const int tradeMax = 100;
+
+        public User(string id, string username, IEnumerable<KeyValuePair<string, double>> currencyAmounts, IEnumerable<string> trades)
         {
             Id = id;
             Username = username;
-            Quantity = quantity;
-            Balance = balance;
-            TradeIds = (tradeIds == null) ? ImmutableList<string>.Empty : tradeIds.ToImmutableList();
+            CurrencyAmounts = (currencyAmounts == null) ? ImmutableDictionary<string, double>.Empty : ImmutableDictionary.CreateRange<string, double>(currencyAmounts);
+            LatestTrades = (trades == null) ? ImmutableQueue<string>.Empty : ImmutableQueue.CreateRange<string>(trades);
         }
 
-        [OnDeserialized]
-        private void OnDeserialize(StreamingContext context)
+        [OnSerializing()]
+        private void OnSerializing(StreamingContext context)
         {
-            TradeIds = (TradeIds == null) ? ImmutableList<string>.Empty : TradeIds.ToImmutableList();
+            _LatestTrades = LatestTrades.ToArray();
+            _CurrencyAmounts = CurrencyAmounts.ToDictionary(x => x.Key, x => x.Value);
+        }
+
+        [OnDeserialized()]
+        private void OnDeserialized(StreamingContext context)
+        {
+            LatestTrades = (_LatestTrades == null) ? ImmutableQueue<string>.Empty : ImmutableQueue.CreateRange<string>(_LatestTrades);
+            CurrencyAmounts = (_CurrencyAmounts == null) ? ImmutableDictionary<string, double>.Empty : ImmutableDictionary<string, double>.Empty.AddRange(_CurrencyAmounts);
         }
 
         [DataMember]
@@ -40,18 +49,38 @@ namespace Common
         [DataMember]
         public readonly string Username;
 
-        [DataMember]
-        public readonly uint Quantity;
+        [DataMember(Name = "CurrencyAmounts")]
+        private Dictionary<string, double> _CurrencyAmounts;
 
-        [DataMember]
-        public readonly uint Balance;
+        [DataMember(Name = "LatestTrades")]
+        private string[] _LatestTrades;
 
-        [DataMember]
-        public IEnumerable<String> TradeIds { get; private set; }
+        [DataMember(Name = "TradeSequenceNumber")]
+        public long TradeSequenceNumber { get; set; }
+
+        public ImmutableDictionary<string, double> CurrencyAmounts { get; private set; }
+
+        public ImmutableQueue<string> LatestTrades { get; private set; }
+
+        public void UpdateCurrencyAmount(string currency, double amount)
+        {
+            var mutable = CurrencyAmounts.ToDictionary(x => x.Key, x => x.Value);
+            mutable[currency] += amount;
+            CurrencyAmounts = mutable.ToImmutableDictionary<string, double>();
+        }
 
         public User AddTrade(string tradeId)
         {
-            return new User(Id, Username, Quantity, Balance, ((IImmutableList<string>)TradeIds).Add(tradeId));
+            if (LatestTrades.Count() <= tradeMax)
+            {
+                return new User(Id, Username, CurrencyAmounts, ((IImmutableQueue<string>)LatestTrades).Enqueue(tradeId));
+            }
+            else
+            {
+                var queue = ((IImmutableQueue<string>)LatestTrades).Dequeue();
+                var newQueue = queue.Enqueue(tradeId);
+                return new User(Id, Username, CurrencyAmounts, newQueue);
+            }
         }
 
         public bool Equals(User other)
@@ -59,9 +88,8 @@ namespace Common
             if (other == null) return false;
             return string.Equals(Id, other.Id) &&
                    string.Equals(Username, Username) &&
-                   Quantity == other.Quantity &&
-                   Balance == other.Balance &&
-                   Equals(TradeIds, other.TradeIds);
+                   CurrencyAmounts == other.CurrencyAmounts &&
+                   Equals(LatestTrades, other.LatestTrades);
         }
 
         public override bool Equals(object obj)
@@ -74,7 +102,7 @@ namespace Common
 
         public override int GetHashCode()
         {
-            return new { Id, Username, Quantity, Balance }.GetHashCode();
+            return new { Id, Username, CurrencyAmounts }.GetHashCode();
         }
     }
 }

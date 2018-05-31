@@ -45,15 +45,17 @@ namespace Fulfillment
             this.Users = new UserStoreClient();
         }
 
+        // This constructor is used during unit testing by setting a mock IReliableStateManagerReplica
         public Fulfillment(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
             : base(context, reliableStateManagerReplica)
         {
-            Init();
             this.Trades = new TradeQueue(this.StateManager, TradeQueueName);
             this.Users = new UserStoreClient();
-            
         }
 
+        /// <summary>
+        /// Init setups in any configuration values
+        /// </summary>
         private void Init()
         {
             // Get configuration from our PackageRoot/Config/Setting.xml file
@@ -104,11 +106,40 @@ namespace Fulfillment
         /// </summary>
         /// <param name="user"></param>
         /// <returns></returns>
-        public async Task<string> AddUserAsync(UserRequestModel userRequest)
+        public async Task<string> AddUserAsync(UserRequestModel userRequest, CancellationToken cancellationToken)
         {
             Validation.ThrowIfNotValidUserRequest(userRequest);
-            var userId = await this.Users.AddUserAsync(userRequest);
+            var userId = await this.Users.AddUserAsync(userRequest, cancellationToken);
             return userId;
+        }
+
+        /// <summary>
+        /// Adds a users to the user store.
+        /// </summary>
+        /// <param name="user"></param>
+        /// <returns></returns>
+        public async Task AddUsersAsync(IEnumerable<UserRequestModel> userRequests, CancellationToken cancellationToken)
+        {
+            List<User> users = new List<User>();
+            foreach (var userRequest in userRequests)
+            {
+                Validation.ThrowIfNotValidUserRequest(userRequest);
+                users.Add(userRequest);
+            }
+            
+            await this.Users.UpdateUsersAsync(users, cancellationToken);
+        }
+
+        /// <summary>
+        /// Updates a user in the user store.
+        /// </summary>
+        /// <param name="userRequest"></param>
+        /// <returns></returns>
+        public async Task<bool> UpdateUserAsync(UserRequestModel userRequest, CancellationToken cancellationToken)
+        {
+            Validation.ThrowIfNotValidUserRequest(userRequest);
+            var success = await this.Users.UpdateUserAsync(userRequest, cancellationToken);
+            return success;
         }
 
         /// <summary>
@@ -116,18 +147,18 @@ namespace Fulfillment
         /// </summary>
         /// <param name="userId"></param>
         /// <returns></returns>
-        public async Task<User> GetUserAsync(string userId)
+        public async Task<User> GetUserAsync(string userId, CancellationToken cancellationToken)
         {
-            return await this.Users.GetUserAsync(userId);
+            return await this.Users.GetUserAsync(userId, cancellationToken);
         }
 
         /// <summary>
         /// Gets all users from the user store.
         /// </summary>
         /// <returns></returns>
-        public async Task<IEnumerable<User>> GetUsersAsync()
+        public async Task<IEnumerable<User>> GetUsersAsync(CancellationToken cancellationToken)
         {
-            return await this.Users.GetUsersAsync();
+            return await this.Users.GetUsersAsync(cancellationToken);
         }
 
         /// <summary>
@@ -135,9 +166,9 @@ namespace Fulfillment
         /// </summary>
         /// <param name="userId"></param>
         /// <returns></returns>
-        public async Task<bool> DeleteUserAsync(string userId)
+        public async Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken)
         {
-            return await this.Users.DeleteUserAsync(userId);
+            return await this.Users.DeleteUserAsync(userId, cancellationToken);
         }
 
         /// <summary>
@@ -146,27 +177,45 @@ namespace Fulfillment
         /// </summary>
         /// <param name="trade"></param>
         /// <returns></returns>
-        private async Task LogAsync(Trade trade)
+        private async Task AddTradeToLogAsync(Trade trade, CancellationToken cancellationToken)
         {
             var randomParitionId = NextInt64(rand);
             var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
             HttpResponseMessage res;
             try
             {
-                res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Logger/api/logger?PartitionKey={randomParitionId.ToString()}&PartitionKind=Int64Range", content);
+                res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Logger/api/logger?PartitionKey={randomParitionId.ToString()}&PartitionKind=Int64Range", content, cancellationToken);
                 if (!res.IsSuccessStatusCode)
                 {
                     throw new TradeNotLoggedException();
                 }
             }
-            catch (Exception ex)
+            catch (HttpRequestException ex)
             {
                 // This will force a retry
                 ServiceEventSource.Current.ServiceMessage(this.Context, $"Error sending trade to logger service, error: {ex.Message}");
                 throw new TradeNotLoggedException();
             }
+            catch (TaskCanceledException ex)
+            {
+                ServiceEventSource.Current.ServiceMessage(this.Context, $"Cancelled while sending trade to logger service, error: {ex.Message}");
+                var wasCancelled = ex.CancellationToken.IsCancellationRequested;
+                if (wasCancelled)
+                {
+                    throw ex;
+                }
+                else
+                {
+                    new TradeNotLoggedException();
+                }
+            }
         }
 
+        /// <summary>
+        /// Generates a random int 64
+        /// </summary>
+        /// <param name="rnd"></param>
+        /// <returns></returns>
         public static Int64 NextInt64(Random rnd)
         {
             var buffer = new byte[sizeof(Int64)];
@@ -185,33 +234,45 @@ namespace Fulfillment
         /// <param name="seller"></param>
         /// <param name="buyer"></param>
         /// <returns></returns>
-        private async Task<bool> ExecuteTradeAsync(ITransaction tx, Trade trade, User seller, User buyer)
+        private async Task<bool> ExecuteTradeAsync(Trade trade, User seller, User buyer, CancellationToken cancellationToken)
         {
+            var newBuyer = UpdateBuyer(trade, buyer);
+            var newSeller = UpdateSeller(trade, seller);
+            var updateUsers = new List<User> { newBuyer, newSeller };
             try
             {
-                var newBuyer = buyer.AddTrade(trade.Id);
-                newBuyer = new User(newBuyer.Id,
-                                newBuyer.Username,
-                                newBuyer.Quantity + trade.Bid.Quantity,
-                                newBuyer.Balance - (trade.Bid.Value * trade.Bid.Quantity),
-                                newBuyer.TradeIds);
-
-                var newSeller = seller.AddTrade(trade.Id);
-                newSeller = new User(newSeller.Id,
-                                    newSeller.Username,
-                                    newSeller.Quantity - trade.Bid.Quantity,
-                                    newSeller.Balance + (trade.Bid.Value * trade.Bid.Quantity),
-                                    newSeller.TradeIds);
-
-                var buyerUpdated = await Users.UpdateUserAsync(newBuyer);
-                var sellerUpdated = await Users.UpdateUserAsync(newSeller);
-                return (buyerUpdated && sellerUpdated);
+                await Users.UpdateUsersAsync(updateUsers, cancellationToken);
             }
-            catch(Exception ex)
+            catch (AggregateException ex)
             {
-                ServiceEventSource.Current.Message($"Error executing trade {ex.Message}");
+                ServiceEventSource.Current.Message($"Failed to update users: {ex.Message}");
                 return false;
             }
+            return true;
+        }
+
+        private static User UpdateSeller(Trade trade, User seller)
+        {
+            var newSeller = seller.AddTrade(trade.Id);
+            newSeller.UpdateCurrencyAmount(trade.Settlement.Pair.GetBuyerWantCurrency(), trade.Settlement.Amount * -1.0);
+            newSeller.UpdateCurrencyAmount(trade.Settlement.Pair.GetSellerWantCurrency(), (trade.Settlement.Amount * trade.Settlement.Price));
+            newSeller = new User(newSeller.Id,
+                                newSeller.Username,
+                                newSeller.CurrencyAmounts,
+                                newSeller.LatestTrades);
+            return newSeller;
+        }
+
+        private static User UpdateBuyer(Trade trade, User buyer)
+        {
+            var newBuyer = buyer.AddTrade(trade.Id);
+            newBuyer.UpdateCurrencyAmount(trade.Settlement.Pair.GetBuyerWantCurrency(), trade.Settlement.Amount);
+            newBuyer.UpdateCurrencyAmount(trade.Settlement.Pair.GetSellerWantCurrency(), (trade.Settlement.Amount * trade.Settlement.Price) * -1.0);
+            newBuyer = new User(newBuyer.Id,
+                            newBuyer.Username,
+                            newBuyer.CurrencyAmounts,
+                            newBuyer.LatestTrades);
+            return newBuyer;
         }
 
         protected override async Task RunAsync(CancellationToken cancellationToken)
@@ -246,8 +307,8 @@ namespace Fulfillment
                         if (trade != null)
                         {
                             // Get the buyer and seller associated with the trade
-                            var seller = await Users.GetUserAsync(trade.Ask.UserId);
-                            var buyer = await Users.GetUserAsync(trade.Bid.UserId);
+                            var seller = await Users.GetUserAsync(trade.Ask.UserId, cancellationToken);
+                            var buyer = await Users.GetUserAsync(trade.Bid.UserId, cancellationToken);
 
                             // If the trade is invalid, we'll throw an exception
                             // and remove it from the queue. If there is a transient
@@ -267,11 +328,34 @@ namespace Fulfillment
                             {
                                 ServiceEventSource.Current.Message($"Dropping bad trade with reason: {ex.Message}");
 
-                                await tx.CommitAsync(); // Removes invalid orders from queue (in a real system we would re-add the valid bid)
+                                await tx.CommitAsync(); // Removes invalid orders from queue (in a real system we would re-add the valid ask)
+                                continue;
+                            }
+                            catch (DuplicateAskException)
+                            {
+                                ServiceEventSource.Current.Message($"Duplicate ask ${trade.Id}");
+
+                                trade = VoidTrade(trade);
+                            }
+                            catch (DuplicateBidException)
+                            {
+                                ServiceEventSource.Current.Message($"Duplicate bid ${trade.Id}");
+
+                                trade = VoidTrade(trade);
+                            }
+
+                            try
+                            {
+                                await AddTradeToLogAsync(trade, cancellationToken);
+                            }
+                            catch (TradeNotLoggedException)
+                            {
+                                // Failed to log the trade, backoff and retry
+                                await BackOff(cancellationToken);
                                 continue;
                             }
 
-                            var applied = await ExecuteTradeAsync(tx, trade, seller, buyer);
+                            var applied = await ExecuteTradeAsync(trade, seller, buyer, cancellationToken);
                             if (applied)
                             {
                                 // Applied indicates both buyer and seller have been
@@ -279,26 +363,26 @@ namespace Fulfillment
                                 // We can now commit the transaction to release our lock
                                 // on the queue.
 
-                                await LogAsync(trade);  // Log trade to an external persistence store
-
                                 ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} completed");
                                 await tx.CommitAsync();
-                                MetricsLog.Traded(trade, Metrics.TradedStatus.Completed );
+
+                                MetricsLog?.Traded(trade, Metrics.TradedStatus.Completed);  // Record trade success
                             }
                             else
                             {
                                 // Atleast one of the buyer or seller failed to update
                                 // or we failed to log the trade.
 
-                                // We are dropping any failed message
-                                // this would normally be deadlettered.
+                                // We are immediately dropping any failed message this
+                                // would normally be deadlettered.
                                 ServiceEventSource.Current.ServiceMessage(this.Context, $"trade {trade.Id} aborted");
                                 tx.Abort();
-                                MetricsLog.Traded(trade, Metrics.TradedStatus.Failed );
+
+                                MetricsLog?.Traded(trade, Metrics.TradedStatus.Failed); // Record trade failed
                             }
                         }
                     }
-                    catch(TradeNotLoggedException)
+                    catch (TradeNotLoggedException)
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"Trade failed to log, abort transaction");
 
@@ -306,12 +390,12 @@ namespace Fulfillment
                         await BackOff(cancellationToken);
                         continue;
                     }
-                    catch(FabricNotPrimaryException)
+                    catch (FabricNotPrimaryException)
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric cannot perform write as it is not the primary replica");
                         return;
                     }
-                    catch(FabricNotReadableException)
+                    catch (FabricNotReadableException)
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"Fabric is not currently readable, aborting and will retry");
 
@@ -319,7 +403,7 @@ namespace Fulfillment
                         await BackOff(cancellationToken);
                         continue;
                     }
-                    catch(InvalidOperationException)
+                    catch (InvalidOperationException)
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"Invalid operation performed, aborting and will retry");
 
@@ -327,9 +411,9 @@ namespace Fulfillment
                         await BackOff(cancellationToken);
                         continue;
                     }
-                    catch(TimeoutException)
+                    catch (TimeoutException)
                     {
-                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Operation timedout, aborting and will retry");
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Operation timed out, aborting and will retry");
 
                         tx.Abort();
                         await BackOff(cancellationToken);
@@ -339,6 +423,18 @@ namespace Fulfillment
             }
         }
 
+        private static Trade VoidTrade(Trade trade)
+        {
+            var voidOrder = new Order(trade.Ask.Pair, 0, 0.0);
+            trade = new Trade(trade.Id, trade.Ask, trade.Bid, voidOrder);
+            return trade;
+        }
+
+        /// <summary>
+        /// BackOff will delay execution for n seconds
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         private static async Task BackOff(CancellationToken cancellationToken)
         {
             ServiceEventSource.Current.Message($"Fulfillment is backing off for {backOffDurationInSec} seconds");

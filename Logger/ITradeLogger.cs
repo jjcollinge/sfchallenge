@@ -9,7 +9,8 @@ namespace Logger
 {
     public interface ITradeLogger
     {
-        Task InsertAsync(Trade trade, CancellationToken cancellation);
-        Task ClearAsync(CancellationToken cancellation);
+        Task InsertAsync(Trade trade, CancellationToken cancellationToken);
+        Task ClearAsync(CancellationToken cancellationToken);
+        Task<long> CountAsync(CancellationToken cancellationToken);
     }
 }
