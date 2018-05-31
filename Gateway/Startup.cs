@@ -67,7 +67,7 @@ namespace Gateway
                     {
                         // Handle bid and ask requests with paritions
                         string forwardingUrl = ForwardingUrl(context, "OrderBook");
-                        var partitionedEndpoint = $"{forwardingUrl}?PartitionKey={currency}&PartitionKind=Named";
+                        var partitionedEndpoint = $"{forwardingUrl}?PartitionKey={currency}&PartitionKind=Named&Timeout=20";
                         await ProxyRequestHelper(context, partitionedEndpoint);
                         return;
                     }
@@ -83,7 +83,7 @@ namespace Gateway
                     // All requests through the gateway will hit a single partition of the 
                     // fulfillment service. This is because we only use it to create 
                     // our test users.
-                    var partitionedEndpoint = new Uri($"{forwardingUrl}?PartitionKey=1&PartitionKind=Int64Range");
+                    var partitionedEndpoint = new Uri($"{forwardingUrl}?PartitionKey=1&PartitionKind=Int64Range&Timeout=20");
                     using (var requestMessage = context.CreateProxyHttpRequest(partitionedEndpoint))
                     {
                         using (var responseMessage = await context.SendProxyHttpRequest(requestMessage))
@@ -101,7 +101,7 @@ namespace Gateway
 
                     // All requests through the gateway will hit a single partition of the 
                     // logger service. This is because we only use it to query the DB count.
-                    var partitionedEndpoint = new Uri($"{forwardingUrl}?PartitionKey=1&PartitionKind=Int64Range");
+                    var partitionedEndpoint = new Uri($"{forwardingUrl}?PartitionKey=1&PartitionKind=Int64Range&Timeout=20");
                     using (var requestMessage = context.CreateProxyHttpRequest(partitionedEndpoint))
                     {
                         using (var responseMessage = await context.SendProxyHttpRequest(requestMessage))

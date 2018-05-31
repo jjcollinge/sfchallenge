@@ -10,6 +10,7 @@ namespace Common
     public class Metrics
     {
         private readonly TelemetryClient _tc;
+        private readonly string _teamName;
 
         public Metrics(string instrumentationKey, string teamName)
         {
@@ -17,7 +18,8 @@ namespace Common
             {
                 InstrumentationKey = instrumentationKey
             };
-            _tc.Context.Cloud.RoleInstance = teamName;
+            _tc.Context.User.Id = teamName;
+            _teamName = teamName;
         }
 
         #region Fulfillment Metrics
@@ -34,6 +36,7 @@ namespace Common
                 { "BidUserId", trade.Bid.UserId },
                 { "TradeId", trade.Id },
                 { "Status", status.ToString("D") },
+                { "TeamName", _teamName }
             };
             var metrics = new Dictionary<string, double>() {
                 { "Spread", trade.Ask.Price - trade.Bid.Price },
@@ -46,7 +49,10 @@ namespace Common
         #region OrderBook Metrics
         public void BidCreated(Order order)
         {
-            var properties = new Dictionary<string, string>() { { "userId", order.UserId } };
+            var properties = new Dictionary<string, string>() {
+                { "userId", order.UserId },
+                { "TeamName", _teamName }
+            };
             var metrics = new Dictionary<string, double>() {
                 { "Amount", order.Amount },
                 { "Price", order.Price },
@@ -56,7 +62,10 @@ namespace Common
 
         public void AskCreated(Order order)
         {
-            var properties = new Dictionary<string, string>() { { "userId", order.UserId } };
+            var properties = new Dictionary<string, string>() {
+                { "userId", order.UserId },
+                { "TeamName", _teamName }
+            };
             var metrics = new Dictionary<string, double>() {
                 { "Amount", order.Amount },
                 { "Price", order.Price },
@@ -68,7 +77,8 @@ namespace Common
         {
             var properties = new Dictionary<string, string>() {
                 { "BidUserId", bid.UserId },
-                { "AskUserId", ask.UserId }
+                { "AskUserId", ask.UserId },
+                { "TeamName", _teamName }
             };
             var metrics = new Dictionary<string, double>() {
                 { "BidAmount", bid.Amount },
@@ -83,13 +93,19 @@ namespace Common
         #region UserStore Metrics
         public void UserCreated(User user)
         {
-            var properties = new Dictionary<string, string>() { { "userId", user.Id } };
+            var properties = new Dictionary<string, string>() {
+                { "userId", user.Id },
+                { "TeamName", _teamName }
+            };
             _tc.TrackEvent("User Created", properties);
         }
 
         public void UserUpdated(User user)
         {
-            var properties = new Dictionary<string, string>() { { "userId", user.Id } };
+            var properties = new Dictionary<string, string>() {
+                { "userId", user.Id },
+                { "TeamName", _teamName }
+            };
             _tc.TrackEvent("User updated", properties);
         }
 

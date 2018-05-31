@@ -221,7 +221,7 @@ while(-not($complete))
 
     if (((get-date) - $starttime).totalseconds -gt $completetimeoutsec)
     {
-        log "Timing out..."
+        log "Timed out. Assume Exchange dropped some trades due to validation. Please retry."
         $status = "unsuccessfully, timed out"
         break
     }
