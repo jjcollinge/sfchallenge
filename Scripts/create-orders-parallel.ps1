@@ -23,8 +23,11 @@ Timeout for HTTP requests to the service
 .PARAMETER completeTimeoutSec
 Timeout for the script to complete
 
+.PARAMETER waitJobTimeout
+Used to set the timeout on the Wait-Job call. If running a large number of trades per job, please set this appropriately.
+
 .EXAMPLE
-. Scripts\create-orders.ps1 -numTradesPerJob 100 -useAllCurrencies $True -isSingleton $False
+. Scripts\create-orders.ps1 -numJobs 3 -numTradesPerJob 30 -useAllCurrencies $True -isSingleton $False
 #>
 Param(
     [string]
@@ -38,7 +41,9 @@ Param(
     [int]
     $requestTimeoutSec=20,
     [int]
-    $completeTimeoutSec=240,
+    $completeTimeoutSec=900,
+    [int]
+    $waitJobTimeout=600,
 	[bool]
 	$isSingleton=$True
 )
@@ -119,7 +124,8 @@ $targetTradeCount = $initialTradeCount + $totalTrades
 
 for ($i = 0; $i -lt $numJobs; $i++)
 {
-    Write-Host "Creating Job ${i}/${numJobs}";
+	$jobNum = $i + 1;
+    Write-Host "Creating Job ${jobNum}/${numJobs}";
 
     Start-Job -Name "Job-${i}" -ScriptBlock {
 
@@ -182,7 +188,7 @@ for ($i = 0; $i -lt $numJobs; $i++)
 Try
 {
     # Wait for all jobs
-    Get-Job | Wait-Job -TimeoutSec 30
+    Get-Job | Wait-Job -TimeoutSec $waitJobTimeout
 
     # Get all jobs
     Get-Job | Receive-Job | Out-GridView
@@ -190,7 +196,7 @@ Try
 Finally
 {
     # Remove all jobs
-    Get-Job | Remove-Job
+    Get-Job | Remove-Job -Force
 }
 
 log "All Jobs complete"
@@ -210,12 +216,12 @@ while(-not($complete))
     else 
     {
         $remaining = $targettradecount - $currenttradecount
-        log "remaining trades: ${remaining}"
+        log "Remaining trades: ${remaining}"
     }
 
     if (((get-date) - $starttime).totalseconds -gt $completetimeoutsec)
     {
-        log "timing out..."
+        log "Timing out..."
         $status = "unsuccessfully, timed out"
         break
     }
