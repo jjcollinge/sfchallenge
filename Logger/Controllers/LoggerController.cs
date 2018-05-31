@@ -41,6 +41,7 @@ namespace Logger.Controllers
 
         // GET api/logger/active
         [Route("active")]
+        [HttpGet]
         public async Task<IActionResult> GetAsync()
         {
             try
