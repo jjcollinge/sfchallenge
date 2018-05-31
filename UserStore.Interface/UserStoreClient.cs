@@ -61,11 +61,11 @@ namespace UserStore.Interface
             return await userStoreProxy.DeleteUserAsync(userId, cancellationToken);
         }
 
-        public async Task<User> GetUserAsync(string userId)
+        public async Task<User> GetUserAsync(string userId, CancellationToken cancellationToken)
         {
             var userStoreProxy = GetUserStoreProxy(userId);
 
-            return await userStoreProxy.GetUserAsync(userId);
+            return await userStoreProxy.GetUserAsync(userId, cancellationToken);
         }
 
         public async Task<bool> UpdateUserAsync(User user, CancellationToken cancellationToken)

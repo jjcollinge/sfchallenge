@@ -232,8 +232,8 @@ namespace Gateway
                 {
                     var streamContent = new StreamContent(request.Body);
                     requestMessage.Content = streamContent;
-
-                } else
+                }
+                else
                 {
                     requestMessage.Content = content;
                 }

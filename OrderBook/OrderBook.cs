@@ -113,7 +113,7 @@ namespace OrderBook
         public async Task<string> AddAskAsync(Order order)
         {
             Validation.ThrowIfNotValidOrder(order);
-            var currentAsks = await asks.CountAsync();
+            var currentAsks = asks.SecondaryIndex.Count;
 
             // You have an SLA with management to not allow orders when a backlog of more than 200 are pending
             // Changing this value with fail a system audit. Other approaches much be used to scale.
@@ -138,7 +138,7 @@ namespace OrderBook
         public async Task<string> AddBidAsync(Order order)
         {
             Validation.ThrowIfNotValidOrder(order);
-            var currentBids = await this.bids.CountAsync();
+            var currentBids = bids.SecondaryIndex.Count;
 
             // You have an SLA with management to not allow orders when a backlog of more than 200 are pending
             // Changing this value with fail a system audit. Other approaches much be used to scale.
@@ -380,14 +380,22 @@ namespace OrderBook
                             // Exception thrown when attempting to make HTTP POST to fulfillment API.
                             // Possibly a DNS, network connectivity or timeout issue. We'll treat it
                             // as transient, back off and retry.
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error sending trade to fulfillment service, error: '{ex.Message}'");
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"HTTP error sending trade to fulfillment service, error: '{ex.Message}'");
+                            await BackOff(cancellationToken);
+                            continue;
+                        }
+                        catch (TimeoutException ex)
+                        {
+                            // Call to Fulfillment service timed out, likely because it is currently down or
+                            // under extreme load
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Call to fulfillment service timed out with error: '{ex.Message}'");
                             await BackOff(cancellationToken);
                             continue;
                         }
                         catch (TaskCanceledException)
                         {
                             // Task has been cancelled, assume SF want's to close us.
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Request to fulfillment service timed out, backing off and retrying.");
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Request to fulfillment service got cancelled");
                             return;
                         }
 
@@ -396,7 +404,8 @@ namespace OrderBook
                         {
                             // Invalid request - fail the orders and 
                             // remove them from our order book.
-                            await LogBadRequest(res);
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error resposne from fulfillment service '{res.StatusCode}'");
+
                             using (var tx = this.StateManager.CreateTransaction())
                             {
                                 await this.asks.RemoveAsync(tx, minAsk);
@@ -410,7 +419,8 @@ namespace OrderBook
                             // Transient error indicating the service
                             // has moved and needs to be re-resolved.
                             // Retry.
-                            await LogBadRequest(res);
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error resposne from fulfillment service '{res.StatusCode}'");
+
                             continue;
                         }
                         if (res?.StatusCode == (HttpStatusCode)429)
@@ -418,7 +428,8 @@ namespace OrderBook
                             // 429 is a custom error that indicates
                             // that the service is under heavy load.
                             // Back off and retry.
-                            await LogBadRequest(res);
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error resposne from fulfillment service '{res.StatusCode}'");
+
                             await BackOff(cancellationToken);
                             continue;
                         }
@@ -451,7 +462,8 @@ namespace OrderBook
                         {
                             // Unhandled error condition.
                             // Log it, back off and retry. 
-                            await LogBadRequest(res);
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error resposne from fulfillment service '{res.StatusCode}'");
+
                             await BackOff(cancellationToken);
                             continue;
                         }
@@ -499,16 +511,6 @@ namespace OrderBook
         {
             ServiceEventSource.Current.Message($"OrderBook is backing off for {backOffDurationInSec} seconds");
             await Task.Delay(TimeSpan.FromSeconds(backOffDurationInSec), cancellationToken);
-        }
-
-        /// <summary>
-        /// Write a log for a bad HTTP Response
-        /// </summary>
-        /// <param name="res"></param>
-        /// <returns></returns>
-        private async Task LogBadRequest(HttpResponseMessage res)
-        {
-            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error, fulfillment service '{res.StatusCode}': {await res.Content.ReadAsStringAsync()}");
         }
 
         /// <summary>

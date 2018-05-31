@@ -54,22 +54,41 @@ namespace UserStore
             return this.CreateServiceRemotingReplicaListeners();
         }
 
-        public async Task<User> GetUserAsync(string userId)
+        public async Task<User> GetUserAsync(string userId, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, User> users =
                await this.StateManager.GetOrAddAsync<IReliableDictionary<string, User>>(StateManagerKey);
 
-            User user = null;
-            using (var tx = this.StateManager.CreateTransaction())
+            var executed = false;
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (!executed && retryCount < 3)
             {
-                var tryUser = await users.TryGetValueAsync(tx, userId);
-                if (tryUser.HasValue)
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
                 {
-                    user = tryUser.Value;
+                    return await ExecuteGetUserAsync(userId, users, cancellationToken);
                 }
-                await tx.CommitAsync();
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
             }
-            return user;
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to get user",
+                    exceptions);
+            return null; // no-op
+            
         }
 
         public async Task<List<User>> GetUsersAsync(CancellationToken cancellationToken)
@@ -185,23 +204,6 @@ namespace UserStore
             return executed; // no-op
         }
 
-        private async Task<string> ExecuteAddUserAsync(User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
-        {
-            using (var tx = this.StateManager.CreateTransaction())
-            {
-                var current = await users.TryGetValueAsync(tx, user.Id);
-                if (current.HasValue)
-                {
-                    return user.Id; // Return existing user
-                }
-                await users.AddAsync(tx, user.Id, user, TimeSpan.FromSeconds(15), cancellationToken);
-                await tx.CommitAsync();
-
-                MetricsLog?.UserCreated(user);
-            }
-            return user.Id;
-        }
-
         public async Task<bool> UpdateUserAsync(User user, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, User> users =
@@ -240,40 +242,6 @@ namespace UserStore
             return false; // no-op
         }
 
-        private async Task<bool> ExecuteUpdateUserAsync(User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
-        {
-            bool result;
-            using (var tx = this.StateManager.CreateTransaction())
-            {
-                var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
-                if (current.HasValue)
-                {
-                    result = await users.TryUpdateAsync(tx, user.Id, user, current.Value, TimeSpan.FromSeconds(15), cancellationToken);
-                    await tx.CommitAsync();
-
-                    MetricsLog?.UserUpdated(user);
-                }
-                else
-                {
-                    throw new ApplicationException($"Cannot update non existent user '{user.Id}'");
-                }
-            }
-            return result;
-        }
-
-        private async Task ExecuteUpdateUserTransactionalAsync(ITransaction tx, User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
-        {
-            var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
-            if (current.HasValue)
-            {
-                await users.TryUpdateAsync(tx, user.Id, user, current.Value, TimeSpan.FromSeconds(15), cancellationToken);
-            }
-            else
-            {
-                throw new ApplicationException($"Cannot update non existent user '{user.Id}'");
-            }
-        }
-
         public async Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, User> users =
@@ -309,6 +277,72 @@ namespace UserStore
                     "Encounted errors while trying to add user",
                     exceptions);
             return false; // no-op
+        }
+
+        private async Task<string> ExecuteAddUserAsync(User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
+        {
+            using (var tx = this.StateManager.CreateTransaction())
+            {
+                var current = await users.TryGetValueAsync(tx, user.Id);
+                if (current.HasValue)
+                {
+                    return user.Id; // Return existing user
+                }
+                await users.AddAsync(tx, user.Id, user, TimeSpan.FromSeconds(15), cancellationToken);
+                await tx.CommitAsync();
+
+                MetricsLog?.UserCreated(user);
+            }
+            return user.Id;
+        }
+
+        private async Task<bool> ExecuteUpdateUserAsync(User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
+        {
+            bool result;
+            using (var tx = this.StateManager.CreateTransaction())
+            {
+                var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
+                if (current.HasValue)
+                {
+                    result = await users.TryUpdateAsync(tx, user.Id, user, current.Value, TimeSpan.FromSeconds(15), cancellationToken);
+                    await tx.CommitAsync();
+
+                    MetricsLog?.UserUpdated(user);
+                }
+                else
+                {
+                    throw new ApplicationException($"Cannot update non existent user '{user.Id}'");
+                }
+            }
+            return result;
+        }
+
+        private async Task ExecuteUpdateUserTransactionalAsync(ITransaction tx, User user, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
+        {
+            var current = await users.TryGetValueAsync(tx, user.Id, LockMode.Update);
+            if (current.HasValue)
+            {
+                await users.TryUpdateAsync(tx, user.Id, user, current.Value, TimeSpan.FromSeconds(15), cancellationToken);
+            }
+            else
+            {
+                throw new ApplicationException($"Cannot update non existent user '{user.Id}'");
+            }
+        }
+
+        private async Task<User> ExecuteGetUserAsync(string userId, IReliableDictionary<string, User> users, CancellationToken cancellationToken)
+        {
+            User user = null;
+            using (var tx = this.StateManager.CreateTransaction())
+            {
+                var tryUser = await users.TryGetValueAsync(tx, userId, LockMode.Default, TimeSpan.FromSeconds(15), cancellationToken);
+                if (tryUser.HasValue)
+                {
+                    user = tryUser.Value;
+                }
+                await tx.CommitAsync();
+            }
+            return user;
         }
 
         private async Task<bool> ExecuteDeleteUserAsync(string userId, IReliableDictionary<string, User> users, CancellationToken cancellationToken)

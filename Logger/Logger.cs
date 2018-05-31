@@ -50,7 +50,16 @@ namespace Logger
             ConfigurationPackage configPackage = this.Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
             String connectionString = configPackage.Settings.Sections["DB"].Parameters["MongoConnectionString"].Value;
             bool.TryParse(configPackage.Settings.Sections["DB"].Parameters["MongoEnableSSL"].Value, out var enableSsl);
-            tradeLogger = MongoDBTradeLogger.Create(connectionString, enableSsl, databaseName, collectionName);
+            try
+            {
+                tradeLogger = MongoDBTradeLogger.Create(connectionString, enableSsl, databaseName, collectionName);
+            }
+            catch(Exception ex)
+            {
+                ServiceEventSource.Current.ServiceMessage(this.Context, $"Error initializing connection to logger ${ex.Message}");
+                BackOff(CancellationToken.None).GetAwaiter().GetResult();
+                Init();
+            }
         }
 
         /// <summary>
@@ -156,10 +165,16 @@ namespace Logger
                         if (result.HasValue)
                         {
                             var trade = result.Value;
-
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Writing trade {trade.Id} to log");
-                            await tradeLogger.InsertAsync(trade, cancellationToken);
-                            await tx.CommitAsync();
+                            if (trade != null)
+                            {
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Writing trade {trade.Id} to log");
+                                if (tradeLogger == null)
+                                {
+                                    Init();
+                                }
+                                await tradeLogger?.InsertAsync(trade, cancellationToken);
+                                await tx.CommitAsync();
+                            }
                         }
                     }
                     catch (LoggerDisconnectedException)

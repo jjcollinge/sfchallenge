@@ -140,9 +140,9 @@ namespace OrderBook.Controllers
 
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
-            catch (MaxOrdersExceededException)
+            catch (MaxOrdersExceededException ex)
             {
-                return new StatusCodeResult(429);
+                return new ContentResult { StatusCode = 429, Content = $"{ex.Message}" };
             }
         }
 
@@ -181,9 +181,9 @@ namespace OrderBook.Controllers
 
                 return new ContentResult { StatusCode = 503, Content = "The service was unable to process the request. Please try again." };
             }
-            catch (MaxOrdersExceededException)
+            catch (MaxOrdersExceededException ex)
             {
-                return new StatusCodeResult(429);
+                return new ContentResult { StatusCode = 429, Content = $"{ex.Message}" };
             }
         }
     }

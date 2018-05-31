@@ -147,9 +147,9 @@ namespace Fulfillment
         /// </summary>
         /// <param name="userId"></param>
         /// <returns></returns>
-        public async Task<User> GetUserAsync(string userId)
+        public async Task<User> GetUserAsync(string userId, CancellationToken cancellationToken)
         {
-            return await this.Users.GetUserAsync(userId);
+            return await this.Users.GetUserAsync(userId, cancellationToken);
         }
 
         /// <summary>
@@ -195,6 +195,19 @@ namespace Fulfillment
                 // This will force a retry
                 ServiceEventSource.Current.ServiceMessage(this.Context, $"Error sending trade to logger service, error: {ex.Message}");
                 throw new TradeNotLoggedException();
+            }
+            catch (TaskCanceledException ex)
+            {
+                ServiceEventSource.Current.ServiceMessage(this.Context, $"Cancelled while sending trade to logger service, error: {ex.Message}");
+                var wasCancelled = ex.CancellationToken.IsCancellationRequested;
+                if (wasCancelled)
+                {
+                    throw ex;
+                }
+                else
+                {
+                    new TradeNotLoggedException();
+                }
             }
         }
 
@@ -294,8 +307,8 @@ namespace Fulfillment
                         if (trade != null)
                         {
                             // Get the buyer and seller associated with the trade
-                            var seller = await Users.GetUserAsync(trade.Ask.UserId);
-                            var buyer = await Users.GetUserAsync(trade.Bid.UserId);
+                            var seller = await Users.GetUserAsync(trade.Ask.UserId, cancellationToken);
+                            var buyer = await Users.GetUserAsync(trade.Bid.UserId, cancellationToken);
 
                             // If the trade is invalid, we'll throw an exception
                             // and remove it from the queue. If there is a transient

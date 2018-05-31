@@ -43,7 +43,8 @@ namespace Fulfillment.Controllers
         {
             try
             {
-                var user = await this.fulfillment.GetUserAsync(id);
+                var ct = new CancellationTokenSource(TimeSpan.FromSeconds(15)).Token;
+                var user = await this.fulfillment.GetUserAsync(id, ct);
                 if (user == null)
                 {
                     return this.NotFound();

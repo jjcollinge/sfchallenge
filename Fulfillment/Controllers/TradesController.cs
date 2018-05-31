@@ -36,9 +36,9 @@ namespace Fulfillment.Controllers
             {
                 return new ContentResult { StatusCode = 410, Content = "The primary replica has moved. Please re-resolve the service." };
             }
-            catch (MaxPendingTradesExceededException)
+            catch (MaxPendingTradesExceededException ex)
             {
-                return new StatusCodeResult(429);
+                return new ContentResult { StatusCode = 429, Content = $"{ex.Message}" };
             }
             catch (FabricException)
             {
