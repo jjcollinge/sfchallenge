@@ -51,7 +51,7 @@ namespace Gateway
 
                 if (IsOrderBookServiceRequest(context))
                 {
-                    PartitionScheme partitioningScheme = await GetOrderBookParititoiningScheme();
+                    PartitionScheme partitioningScheme = await GetOrderBookPartitioningScheme();
 
                     var currency = GetAndRemoveCurrencyFromRequest(ref context);
                     if (partitioningScheme == PartitionScheme.Singleton)
@@ -75,7 +75,7 @@ namespace Gateway
                     throw new InvalidOperationException("OrderBook must use either singleton or named partition scheme");
                 }
 
-                if (IsFulfilmentServiceRequest(context))
+                if (IsFulfillmentServiceRequest(context))
                 {
                     // Handle user or trade requests with/without parition
                     string forwardingUrl = ForwardingUrl(context, "Fulfillment");
@@ -117,7 +117,7 @@ namespace Gateway
             });
         }
 
-        private static async Task<System.Fabric.Description.PartitionScheme> GetOrderBookParititoiningScheme()
+        private static async Task<System.Fabric.Description.PartitionScheme> GetOrderBookPartitioningScheme()
         {
             FabricClient client = new FabricClient();
             var serviceDesc = await client.ServiceManager.GetServiceDescriptionAsync(new Uri($"{Gateway.StaticContext.CodePackageActivationContext.ApplicationName}/OrderBook"));
@@ -187,7 +187,7 @@ namespace Gateway
             return context.Request.Path.Value.Contains("api/orders");
         }
 
-        private static bool IsFulfilmentServiceRequest(HttpContext context)
+        private static bool IsFulfillmentServiceRequest(HttpContext context)
         {
             return context.Request.Path.Value.Contains("/api/user") || context.Request.Path.Value.Contains("/api/trades");
         }
