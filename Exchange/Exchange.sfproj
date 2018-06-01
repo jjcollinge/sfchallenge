@@ -37,9 +37,7 @@
     <ProjectReference Include="..\UserStore\UserStore.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\MongoGuestExe\**\*.*">
-      <Link>ApplicationPackageRoot\MongoGuestExePkg\Code\%(RecursiveDir)%(Filename)%(Extension)</Link>
-    </Content>
+    <Content Include="..\MongoGuestExe\**\*.*" />
     <Content Include="ApplicationPackageRoot\MongoGuestExePkg\Config\Settings.xml" />
     <Content Include="ApplicationPackageRoot\MongoGuestExePkg\ServiceManifest.xml" />
     <Content Include="packages.config" />
