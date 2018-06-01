@@ -5,11 +5,10 @@
     <IsServiceFabricServiceProject>True</IsServiceFabricServiceProject>
     <RuntimeIdentifier>win7-x64</RuntimeIdentifier>
     <Platforms>AnyCPU;x64</Platforms>
-    <ApplicationInsightsResourceId>/subscriptions/995c6481-7ddc-4dac-afd4-33545d96cf29/resourcegroups/jocollin/providers/microsoft.insights/components/jocollin</ApplicationInsightsResourceId>
-    <ApplicationInsightsAnnotationResourceId>/subscriptions/995c6481-7ddc-4dac-afd4-33545d96cf29/resourcegroups/jocollin/providers/microsoft.insights/components/jocollin</ApplicationInsightsAnnotationResourceId>
   </PropertyGroup>
 
   <ItemGroup>
+    <Folder Include="Connected Services\" />
     <Folder Include="wwwroot\" />
   </ItemGroup>
 
@@ -35,9 +34,4 @@
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <WCFMetadata Include="Connected Services" />
-  </ItemGroup>
-
 </Project>
