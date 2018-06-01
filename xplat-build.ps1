@@ -1,5 +1,5 @@
 # Install powershell from Mac or Linux here: https://github.com/powershell/powershell
-
+# Create a local cluster using Docker here: https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-get-started-mac
 function New-TemporaryDirectory {
     $parent = [System.IO.Path]::GetTempPath()
     [string] $name = [System.Guid]::NewGuid()
@@ -45,7 +45,7 @@ foreach ($p in $projects){
     Remove-Item -Recurse $tempDir.FullName
 
     ## Create config.zip in publish dir
-    Compress-Archive -Path (Join-Path $packageRootDir "Config" "*")  -DestinationPath (Join-Path $projectPkgFolder "Config.zip")
+    Compress-Archive -Path (Join-Path (Join-Path $packageRootDir "Config") "*")  -DestinationPath (Join-Path $projectPkgFolder "Config.zip")
     
     ## Copy service manifest
     Copy-Item -Path (Join-Path $packageRootDir "ServiceManifest.xml") -Destination $projectPkgFolder
