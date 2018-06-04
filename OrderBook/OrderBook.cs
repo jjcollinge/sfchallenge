@@ -286,6 +286,24 @@ namespace OrderBook
                     maxBid = this.bids.GetMaxOrder();
                     minAsk = this.asks.GetMinOrder();
 
+                    if (maxBid == null || minAsk == null)
+                    {
+                        continue;
+                    }
+                    
+                    // Enforce TTL: Remove unmatched bids/asks after 5mins. 
+                    if (maxBid.Timestamp.AddMinutes(5) < DateTime.UtcNow)
+                    {
+                        await this.bids.RemoveAsync(maxBid);
+                        continue;
+                    }
+
+                    if (minAsk.Timestamp.AddMinutes(5) < DateTime.UtcNow)
+                    {
+                        await this.asks.RemoveAsync(minAsk);
+                        continue;
+                    }
+
                     if (IsMatch(maxBid, minAsk))
                     {
                         ServiceEventSource.Current.ServiceMessage(this.Context, $"New match: bid {maxBid.Id} and ask {minAsk.Id}");
