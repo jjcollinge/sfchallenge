@@ -81,7 +81,7 @@ namespace Gateway
                 }
 
                 // If the path matches the Fulfillment api
-                if (IsFulfilmentServiceRequest(context))
+                if (IsFulfillmentServiceRequest(context))
                 {
                     // The Fulfillment service is Int64Range partitioned by default
                     // so we don't handle the singleton case.
