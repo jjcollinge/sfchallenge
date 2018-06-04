@@ -64,7 +64,7 @@ namespace Fulfillment
             maxPendingTrades = int.Parse(configurationPackage.Settings.Sections["ClusterConfig"].Parameters["MaxTradesPending"].Value);
 
             // Metrics used to compare team performance and reliability against each other
-            var metricsInstrumentationKey = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["Metrics_AppInsights_InstrumentationKey"].Value;
+            var metricsInstrumentationKey = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["Admin_AppInsights_InstrumentationKey"].Value;
             var teamName = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["TeamName"].Value;
             this.MetricsLog = new Metrics(metricsInstrumentationKey, teamName);
         }
@@ -474,13 +474,9 @@ namespace Fulfillment
                                         services => services
                                             .AddSingleton<StatefulServiceContext>(serviceContext)
                                             .AddSingleton<IReliableStateManager>(this.StateManager)
-                                            .AddSingleton<Fulfillment>(this)
-                                            .AddSingleton<ITelemetryInitializer>((serviceProvider) => FabricTelemetryInitializerExtension.CreateFabricTelemetryInitializer(serviceContext))
-                                            .AddSingleton<ITelemetryModule>(new ServiceRemotingDependencyTrackingTelemetryModule())
-                                            .AddSingleton<ITelemetryModule>(new ServiceRemotingRequestTrackingTelemetryModule()))
+                                            .AddSingleton<Fulfillment>(this))
                                     .UseContentRoot(Directory.GetCurrentDirectory())
                                     .UseStartup<Startup>()
-                                    .UseApplicationInsights()
                                     .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseReverseProxyIntegration)
                                     .UseUrls(url)
                                     .Build();

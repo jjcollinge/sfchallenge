@@ -100,7 +100,7 @@ namespace OrderBook
             maxPendingBids = int.Parse(configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
 
             // Metrics used to compare team performance and reliability against each other
-            var metricsInstrumentationKey = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Metrics_AppInsights_InstrumentationKey"].Value;
+            var metricsInstrumentationKey = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Admin_AppInsights_InstrumentationKey"].Value;
             var teamName = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["TeamName"].Value;
             this.MetricsLog = new Metrics(metricsInstrumentationKey, teamName);
         }
@@ -560,11 +560,9 @@ namespace OrderBook
                                         services => services
                                             .AddSingleton<HttpClient>(new HttpClient())
                                             .AddSingleton<StatefulServiceContext>(serviceContext)
-                                            .AddSingleton<OrderBook>(this)
-                                            .AddSingleton<ITelemetryInitializer>((serviceProvider) => FabricTelemetryInitializerExtension.CreateFabricTelemetryInitializer(serviceContext)))
+                                            .AddSingleton<OrderBook>(this))
                                     .UseContentRoot(Directory.GetCurrentDirectory())
                                     .UseStartup<Startup>()
-                                    .UseApplicationInsights()
                                     .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseReverseProxyIntegration)
                                     .UseUrls(url)
                                     .Build();

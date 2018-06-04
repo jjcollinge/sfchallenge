@@ -37,7 +37,7 @@ namespace UserStore
             var configurationPackage = Context.CodePackageActivationContext.GetConfigurationPackageObject("Config");
 
             // Metrics used to compare team performance and reliability against each other
-            var metricsInstrumentationKey = configurationPackage.Settings.Sections["UserStoreConfig"].Parameters["Metrics_AppInsights_InstrumentationKey"].Value;
+            var metricsInstrumentationKey = configurationPackage.Settings.Sections["UserStoreConfig"].Parameters["Admin_AppInsights_InstrumentationKey"].Value;
             var teamName = configurationPackage.Settings.Sections["UserStoreConfig"].Parameters["TeamName"].Value;
             this.MetricsLog = new Metrics(metricsInstrumentationKey, teamName);
         }
