@@ -21,7 +21,7 @@ namespace UserStore.Tests
             ConfigurationSection userStoreConfig = CreateConfigurationSection("UserStoreConfig");
             configSections.Add(userStoreConfig);
 
-            ConfigurationProperty appInsightsKey = CreateConfigurationSectionParameters("Metrics_AppInsights_InstrumentationKey", "");
+            ConfigurationProperty appInsightsKey = CreateConfigurationSectionParameters("Admin_AppInsights_InstrumentationKey", "");
             userStoreConfig.Parameters.Add(appInsightsKey);
 
             ConfigurationProperty teamName = CreateConfigurationSectionParameters("TeamName", "");
