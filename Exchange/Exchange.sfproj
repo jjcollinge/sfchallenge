@@ -37,9 +37,7 @@
     <ProjectReference Include="..\UserStore\UserStore.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\MongoGuestExe\**\*.*" />
-    <Content Include="ApplicationPackageRoot\MongoGuestExePkg\Config\Settings.xml" />
-    <Content Include="ApplicationPackageRoot\MongoGuestExePkg\ServiceManifest.xml" />
+    <Content Include="ApplicationPackageRoot\MongoGuestExePkg\**\*.*" />
     <Content Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
