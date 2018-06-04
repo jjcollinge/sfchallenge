@@ -372,8 +372,8 @@ namespace OrderBook
                         HttpResponseMessage res = null;
                         try
                         {
-                            var randomParitionId = NextInt64(rand); // Send to any partition - it doesn't matter.
-                            res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Fulfillment/api/trades?PartitionKey={randomParitionId.ToString()}&PartitionKind=Int64Range", content, cancellationToken);
+                            var randomPartitionId = NextInt64(rand); // Send to any partition - it doesn't matter.
+                            res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Fulfillment/api/trades?PartitionKey={randomPartitionId.ToString()}&PartitionKind=Int64Range", content, cancellationToken);
                         }
                         catch (HttpRequestException ex)
                         {
