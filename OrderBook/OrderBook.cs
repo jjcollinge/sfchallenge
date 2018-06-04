@@ -110,7 +110,7 @@ namespace OrderBook
             maxPendingBids = int.Parse(configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
 
             // Metrics used to compare team performance and reliability against each other
-            var metricsInstrumentationKey = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Metrics_AppInsights_InstrumentationKey"].Value;
+            var metricsInstrumentationKey = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Admin_AppInsights_InstrumentationKey"].Value;
             var teamName = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["TeamName"].Value;
             this.MetricsLog = new Metrics(metricsInstrumentationKey, teamName);
         }
@@ -125,8 +125,7 @@ namespace OrderBook
             Validation.ThrowIfNotValidOrder(order);
             var currentAsks = await asks.CountAsync();
 
-            // You have an SLA with management to not allow orders when a backlog of more than 200 are pending
-            // Changing this value with fail a system audit. Other approaches much be used to scale.
+            // REQUIRED, DO NOT REMOVE.         
             if (currentAsks > maxPendingAsks)
             {
                 ServiceEventSource.Current.ServiceMaxPendingLimitHit();
@@ -148,10 +147,9 @@ namespace OrderBook
         public async Task<string> AddBidAsync(Order order)
         {
             Validation.ThrowIfNotValidOrder(order);
-            var currentBids = await asks.CountAsync();
+            var currentBids = await bids.CountAsync();
 
-            // You have an SLA with management to not allow orders when a backlog of more than 200 are pending
-            // Changing this value with fail a system audit. Other approaches much be used to scale.
+            // REQUIRED, DO NOT REMOVE.         
             if (currentBids > maxPendingBids)
             {
                 ServiceEventSource.Current.ServiceMaxPendingLimitHit();
@@ -291,8 +289,7 @@ namespace OrderBook
                         await Task.Delay(500, cancellationToken);
                     }
 
-                    // Get the maximum bid and minimum ask
-                    // from our secondary index.
+                    // Get the maximum bid and minimum ask from our secondary index.
                     maxBid = this.bids.GetMaxOrder();
                     minAsk = this.asks.GetMinOrder();
 
@@ -318,9 +315,11 @@ namespace OrderBook
                         continue;
                     }
 
+                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Checking for new match");
+
                     if (IsMatch(maxBid, minAsk))
                     {
-                        ServiceEventSource.Current.ServiceMessage(this.Context, $"New match: bid {maxBid.Id} and ask {minAsk.Id}");
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"New match made between Bid {maxBid.Id} and Ask {minAsk.Id}");
                         MetricsLog?.OrderMatched(maxBid, minAsk);
 
                         try
@@ -424,11 +423,21 @@ namespace OrderBook
                             await BackOff(cancellationToken);
                             continue;
                         }
-                        catch (TaskCanceledException)
+                        catch (TaskCanceledException ex)
                         {
                             // Task has been cancelled, assume SF want's to close us.
                             ServiceEventSource.Current.ServiceMessage(this.Context, $"Request to fulfillment service got cancelled");
-                            return;
+
+                            var wasCancelled = ex.CancellationToken.IsCancellationRequested;
+                            if (wasCancelled)
+                            {
+                                return;
+                            }
+                            else
+                            {
+                                await BackOff(cancellationToken);
+                                continue;
+                            }
                         }
 
                         // If the response from the Fulfillment API was not 2xx
@@ -521,6 +530,12 @@ namespace OrderBook
             }
         }
 
+        /// <summary>
+        /// Checks whether a specific fabric error code
+        /// can be considered transient.
+        /// </summary>
+        /// <param name="errorCode"></param>
+        /// <returns></returns>
         private bool IsTransientError(FabricErrorCode errorCode)
         {
             switch (errorCode)
@@ -577,11 +592,9 @@ namespace OrderBook
                                         services => services
                                             .AddSingleton<HttpClient>(new HttpClient())
                                             .AddSingleton<StatefulServiceContext>(serviceContext)
-                                            .AddSingleton<OrderBook>(this)
-                                            .AddSingleton<ITelemetryInitializer>((serviceProvider) => FabricTelemetryInitializerExtension.CreateFabricTelemetryInitializer(serviceContext)))
+                                            .AddSingleton<OrderBook>(this))
                                     .UseContentRoot(Directory.GetCurrentDirectory())
                                     .UseStartup<Startup>()
-                                    .UseApplicationInsights()
                                     .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseReverseProxyIntegration)
                                     .UseUrls(url)
                                     .Build();

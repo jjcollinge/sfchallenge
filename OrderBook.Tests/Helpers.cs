@@ -27,7 +27,7 @@ namespace OrderBook.Tests
             ConfigurationProperty maxBidsPending = CreateConfigurationSectionParameters("MaxBidsPending", "200");
             orderBookConfig.Parameters.Add(maxBidsPending);
 
-            ConfigurationProperty appInsightsKey = CreateConfigurationSectionParameters("Metrics_AppInsights_InstrumentationKey", "");
+            ConfigurationProperty appInsightsKey = CreateConfigurationSectionParameters("Admin_AppInsights_InstrumentationKey", "");
             orderBookConfig.Parameters.Add(appInsightsKey);
 
             ConfigurationProperty teamName = CreateConfigurationSectionParameters("TeamName", "");

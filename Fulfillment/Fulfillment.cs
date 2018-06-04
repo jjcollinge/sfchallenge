@@ -64,7 +64,7 @@ namespace Fulfillment
             maxPendingTrades = int.Parse(configurationPackage.Settings.Sections["ClusterConfig"].Parameters["MaxTradesPending"].Value);
 
             // Metrics used to compare team performance and reliability against each other
-            var metricsInstrumentationKey = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["Metrics_AppInsights_InstrumentationKey"].Value;
+            var metricsInstrumentationKey = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["Admin_AppInsights_InstrumentationKey"].Value;
             var teamName = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["TeamName"].Value;
             this.MetricsLog = new Metrics(metricsInstrumentationKey, teamName);
         }
@@ -80,6 +80,7 @@ namespace Fulfillment
         {
             Validation.ThrowIfNotValidTradeRequest(tradeRequest);
 
+            // REQUIRED, DO NOT REMOVE.
             var pendingTrades = await Trades.CountAsync();
             if (pendingTrades > maxPendingTrades)
             {
@@ -179,11 +180,13 @@ namespace Fulfillment
         /// <returns></returns>
         private async Task AddTradeToLogAsync(Trade trade, CancellationToken cancellationToken)
         {
-            var randomParitionId = NextInt64(rand);
-            var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
             HttpResponseMessage res;
             try
             {
+                var content = new StringContent(JsonConvert.SerializeObject(trade), Encoding.UTF8, "application/json");
+
+                // Send to a random logger partition
+                var randomParitionId = NextInt64(rand);
                 res = await client.PostAsync($"http://localhost:{reverseProxyPort}/Exchange/Logger/api/logger?PartitionKey={randomParitionId.ToString()}&PartitionKind=Int64Range", content, cancellationToken);
                 if (!res.IsSuccessStatusCode)
                 {
@@ -253,6 +256,7 @@ namespace Fulfillment
 
         private static User UpdateSeller(Trade trade, User seller)
         {
+            // Users are immutable so construct a new user and copy over the existing properties
             var newSeller = seller.AddTrade(trade.Id);
             newSeller.UpdateCurrencyAmount(trade.Settlement.Pair.GetBuyerWantCurrency(), trade.Settlement.Amount * -1.0);
             newSeller.UpdateCurrencyAmount(trade.Settlement.Pair.GetSellerWantCurrency(), (trade.Settlement.Amount * trade.Settlement.Price));
@@ -265,6 +269,7 @@ namespace Fulfillment
 
         private static User UpdateBuyer(Trade trade, User buyer)
         {
+            // Users are immutable so construct a new user and copy over the existing properties
             var newBuyer = buyer.AddTrade(trade.Id);
             newBuyer.UpdateCurrencyAmount(trade.Settlement.Pair.GetBuyerWantCurrency(), trade.Settlement.Amount);
             newBuyer.UpdateCurrencyAmount(trade.Settlement.Pair.GetSellerWantCurrency(), (trade.Settlement.Amount * trade.Settlement.Price) * -1.0);
@@ -302,10 +307,14 @@ namespace Fulfillment
                 {
                     try
                     {
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Fetching next trade");
+
                         var trade = await this.Trades.DequeueAsync(tx, cancellationToken);
 
                         if (trade != null)
                         {
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Processing new trade {trade.Id}");
+
                             // Get the buyer and seller associated with the trade
                             var seller = await Users.GetUserAsync(trade.Ask.UserId, cancellationToken);
                             var buyer = await Users.GetUserAsync(trade.Bid.UserId, cancellationToken);
@@ -423,6 +432,11 @@ namespace Fulfillment
             }
         }
 
+        /// <summary>
+        /// Voids a trade to make it worthless
+        /// </summary>
+        /// <param name="trade"></param>
+        /// <returns></returns>
         private static Trade VoidTrade(Trade trade)
         {
             var voidOrder = new Order(trade.Ask.Pair, 0, 0.0);
@@ -460,13 +474,9 @@ namespace Fulfillment
                                         services => services
                                             .AddSingleton<StatefulServiceContext>(serviceContext)
                                             .AddSingleton<IReliableStateManager>(this.StateManager)
-                                            .AddSingleton<Fulfillment>(this)
-                                            .AddSingleton<ITelemetryInitializer>((serviceProvider) => FabricTelemetryInitializerExtension.CreateFabricTelemetryInitializer(serviceContext))
-                                            .AddSingleton<ITelemetryModule>(new ServiceRemotingDependencyTrackingTelemetryModule())
-                                            .AddSingleton<ITelemetryModule>(new ServiceRemotingRequestTrackingTelemetryModule()))
+                                            .AddSingleton<Fulfillment>(this))
                                     .UseContentRoot(Directory.GetCurrentDirectory())
                                     .UseStartup<Startup>()
-                                    .UseApplicationInsights()
                                     .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseReverseProxyIntegration)
                                     .UseUrls(url)
                                     .Build();
