@@ -15,7 +15,6 @@
     <Parameter Name="MongoEnableSSL" DefaultValue="false" />
     <!-- Gateway parameters -->
     <Parameter Name="Gateway_InstanceCount" DefaultValue="1" />
-    <Parameter Name="Logger_Port" DefaultValue="9082" />
     <!-- UserStore parameters -->
     <Parameter Name="UserStore_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="UserStore_PartitionCount" DefaultValue="1" />
@@ -24,14 +23,12 @@
     <Parameter Name="Fulfillment_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="Fulfillment_PartitionCount" DefaultValue="1" />
     <Parameter Name="Fulfillment_TargetReplicaSetSize" DefaultValue="3" />
-    <Parameter Name="Fulfillment_Port" DefaultValue="9080" />
     <!-- OrderBook parameters -->
     <Parameter Name="OrderBook_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="OrderBook_PartitionCount" DefaultValue="1" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" DefaultValue="3" />
-    <Parameter Name="OrderBook_Port" DefaultValue="9081" />
     <!-- The following parameters are defined by the adminstrators, do not change or remove -->
-    <Parameter Name="Admin_AppInsights_InstrumentationKey" DefaultValue="" />
+    <Parameter Name="Admin_AppInsights_InstrumentationKey" DefaultValue="0e533f02-1e64-405c-afc6-9e3bfb62686b" />
     <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="800" />
     <Parameter Name="OrderBook_MaxBidsPending" DefaultValue="700" />
     <Parameter Name="OrderBook_MaxAsksPending" DefaultValue="700" />
@@ -53,11 +50,6 @@
         </Settings>
       </ConfigOverride>
     </ConfigOverrides>
-    <ResourceOverrides>
-      <Endpoints>
-        <Endpoint Name="ServiceEndpoint" Port="[Logger_Port]" />
-      </Endpoints>
-    </ResourceOverrides>
   </ServiceManifestImport>
   <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="GatewayPkg" ServiceManifestVersion="1.0.0" />
@@ -93,11 +85,6 @@
         </Settings>
       </ConfigOverride>
     </ConfigOverrides>
-    <ResourceOverrides>
-      <Endpoints>
-        <Endpoint Name="ServiceEndpoint" Port="[Fulfillment_Port]" />
-      </Endpoints>
-    </ResourceOverrides>
   </ServiceManifestImport>
   <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="OrderBookPkg" ServiceManifestVersion="1.0.0" />
@@ -116,11 +103,6 @@
         </Settings>
       </ConfigOverride>
     </ConfigOverrides>
-    <ResourceOverrides>
-      <Endpoints>
-        <Endpoint Name="ServiceEndpoint" Port="[OrderBook_Port]" />
-      </Endpoints>
-    </ResourceOverrides>
   </ServiceManifestImport>
   <DefaultServices>
     <!-- Create Gateway Service -->
