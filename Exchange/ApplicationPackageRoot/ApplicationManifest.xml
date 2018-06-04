@@ -122,13 +122,13 @@
       </StatefulService>
     </Service>
     <!-- Create Fulfillment Service -->
-    <Service Name="Fulfillment" ServiceDnsName="fulfillment.exchange" ServicePackageActivationMode="ExclusiveProcess">
+    <Service Name="Fulfillment" ServicePackageActivationMode="ExclusiveProcess">
       <StatefulService ServiceTypeName="FulfillmentType" TargetReplicaSetSize="[Fulfillment_TargetReplicaSetSize]" MinReplicaSetSize="[Fulfillment_MinReplicaSetSize]">
         <UniformInt64Partition PartitionCount="[Fulfillment_PartitionCount]" LowKey="-9223372036854775808" HighKey="9223372036854775807" />
       </StatefulService>
     </Service>
     <!-- Create OrderBook Service -->
-    <Service Name="OrderBook" ServiceDnsName="orderbook.exchange">
+    <Service Name="OrderBook">
       <StatefulService ServiceTypeName="OrderBookType" TargetReplicaSetSize="[OrderBook_TargetReplicaSetSize]" MinReplicaSetSize="[OrderBook_MinReplicaSetSize]">
         <SingletonPartition />
       </StatefulService>
