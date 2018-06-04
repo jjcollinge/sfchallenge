@@ -299,18 +299,18 @@ namespace OrderBook
                     }
 
                     // Enforce TTL: Remove unmatched bids/asks after 5mins. 
-                    var isBidTimedout = maxBid.Timestamp.AddMinutes(5) < DateTime.UtcNow;
-                    var isAskTimedout = minAsk.Timestamp.AddMinutes(5) < DateTime.UtcNow;
-                    if (isBidTimedout)
+                    var hasBidTimedout = maxBid.Timestamp.AddMinutes(5) < DateTime.UtcNow;
+                    var hasAskTimedout = minAsk.Timestamp.AddMinutes(5) < DateTime.UtcNow;
+                    if (hasBidTimedout)
                     {
                         await this.bids.RemoveAsync(maxBid);
                     }
 
-                    if (isAskTimedout)
+                    if (hasAskTimedout)
                     {
                         await this.asks.RemoveAsync(minAsk);
                     }
-                    if (isBidTimedout || isAskTimedout)
+                    if (hasBidTimedout || hasAskTimedout)
                     {
                         continue;
                     }
