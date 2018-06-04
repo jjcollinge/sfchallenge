@@ -58,11 +58,21 @@ namespace OrderBook
         }
 
         // This constructor is used during unit testing by setting a mock IReliableStateManagerReplica
-        public OrderBook(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
+        public OrderBook(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica, Order ask = null, Order bid = null, int maxPendingAsks = 10, int maxPendingBids = 10)
             : base(context, reliableStateManagerReplica)
         {
+            this.maxPendingAsks = maxPendingAsks;
+            this.maxPendingBids = maxPendingBids;
             this.asks = new OrderSet(reliableStateManagerReplica, AskBookName);
+            if (ask != null)
+            {
+                this.asks.SecondaryIndex = this.asks.SecondaryIndex.Add(ask);
+            }
             this.bids = new OrderSet(reliableStateManagerReplica, BidBookName);
+            if (bid != null)
+            {
+                this.bids.SecondaryIndex = this.bids.SecondaryIndex.Add(bid);
+            }
         }
 
         /// <summary>
@@ -290,17 +300,21 @@ namespace OrderBook
                     {
                         continue;
                     }
-                    
+
                     // Enforce TTL: Remove unmatched bids/asks after 5mins. 
-                    if (maxBid.Timestamp.AddMinutes(5) < DateTime.UtcNow)
+                    var isBidTimedout = maxBid.Timestamp.AddMinutes(5) < DateTime.UtcNow;
+                    var isAskTimedout = minAsk.Timestamp.AddMinutes(5) < DateTime.UtcNow;
+                    if (isBidTimedout)
                     {
                         await this.bids.RemoveAsync(maxBid);
-                        continue;
                     }
 
-                    if (minAsk.Timestamp.AddMinutes(5) < DateTime.UtcNow)
+                    if (isAskTimedout)
                     {
                         await this.asks.RemoveAsync(minAsk);
+                    }
+                    if (isBidTimedout || isAskTimedout)
+                    {
                         continue;
                     }
 

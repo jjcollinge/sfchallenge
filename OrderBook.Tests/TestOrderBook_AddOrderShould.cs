@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Fabric;
 using System.Fabric.Description;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 using static ServiceFabric.Mocks.MockConfigurationPackage;
@@ -87,6 +88,51 @@ namespace OrderBook.Tests
         }
 
         [Fact]
+        public async Task RemoveOrdersOverTTL_ExpectNoOrdersAfterRun()
+        {
+            var context = Helpers.GetMockContext();
+            var stateManager = new MockReliableStateManager();
+
+            var ask = new Order("user1", "buyer", CurrencyPair.GBPUSD, 100, 30, DateTime.UtcNow.AddMinutes(-6));
+            var bid = new Order("user2", "seller", CurrencyPair.GBPUSD, 100, 30, DateTime.UtcNow.AddMinutes(-6));
+            var service = new OrderBook(context, stateManager, ask, bid);
+            try
+            {
+                await service.AddAskAsync(ask);
+                await service.AddBidAsync(bid);
+            }
+            catch (NotImplementedException)
+            {
+                // Expected, see line 13.
+            }
+
+            var cancellationToken = new CancellationTokenSource();
+            Task cancelLoop = Task.Run(async () =>
+            {
+                await Task.Delay(8000);
+                cancellationToken.Cancel();
+            });
+
+            Task loop = Task.Run(async () =>
+            {
+                try
+                {
+                    await service.InvokeRunAsync(cancellationToken.Token);
+                }
+                catch { }
+            });
+
+            await Task.WhenAll(loop, cancelLoop);
+
+            await Task.Delay(1000);
+
+            var asks = await service.CountAskAsync();
+            Assert.Equal(0, asks);
+            var bids = await service.CountBidAsync();
+            Assert.Equal(0, bids);
+        }
+
+        [Fact]
         public async Task ThrowIfZeroPriceOrder()
         {
             var context = Helpers.GetMockContext();
@@ -97,5 +143,5 @@ namespace OrderBook.Tests
             await Assert.ThrowsAsync<InvalidOrderException>(() => service.AddAskAsync(ask));
         }
 
-   }
+    }
 }
