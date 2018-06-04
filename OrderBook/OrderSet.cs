@@ -183,6 +183,7 @@ namespace OrderBook
                     {
                         this.SecondaryIndex = this.SecondaryIndex.Remove(order);
                     }
+                    await tx.CommitAsync();
                     return true;
                 }
             }

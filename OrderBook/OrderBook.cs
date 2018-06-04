@@ -58,11 +58,21 @@ namespace OrderBook
         }
 
         // This constructor is used during unit testing by setting a mock IReliableStateManagerReplica
-        public OrderBook(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica)
+        public OrderBook(StatefulServiceContext context, IReliableStateManagerReplica reliableStateManagerReplica, Order ask = null, Order bid = null, int maxPendingAsks = 10, int maxPendingBids = 10)
             : base(context, reliableStateManagerReplica)
         {
+            this.maxPendingAsks = maxPendingAsks;
+            this.maxPendingBids = maxPendingBids;
             this.asks = new OrderSet(reliableStateManagerReplica, AskBookName);
+            if (ask != null)
+            {
+                this.asks.SecondaryIndex = this.asks.SecondaryIndex.Add(ask);
+            }
             this.bids = new OrderSet(reliableStateManagerReplica, BidBookName);
+            if (bid != null)
+            {
+                this.bids.SecondaryIndex = this.bids.SecondaryIndex.Add(bid);
+            }
         }
 
         /// <summary>
@@ -282,6 +292,28 @@ namespace OrderBook
                     // Get the maximum bid and minimum ask from our secondary index.
                     maxBid = this.bids.GetMaxOrder();
                     minAsk = this.asks.GetMinOrder();
+
+                    if (maxBid == null || minAsk == null)
+                    {
+                        continue;
+                    }
+
+                    // Enforce TTL: Remove unmatched bids/asks after 5mins. 
+                    var hasBidTimedout = maxBid.Timestamp.AddMinutes(5) < DateTime.UtcNow;
+                    var hasAskTimedout = minAsk.Timestamp.AddMinutes(5) < DateTime.UtcNow;
+                    if (hasBidTimedout)
+                    {
+                        await this.bids.RemoveAsync(maxBid);
+                    }
+
+                    if (hasAskTimedout)
+                    {
+                        await this.asks.RemoveAsync(minAsk);
+                    }
+                    if (hasBidTimedout || hasAskTimedout)
+                    {
+                        continue;
+                    }
 
                     ServiceEventSource.Current.ServiceMessage(this.Context, $"Checking for new match");
 
