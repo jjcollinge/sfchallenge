@@ -1,5 +1,6 @@
 
-[![Build Status](https://theazurechallenge.visualstudio.com/_apis/public/build/definitions/0928da5b-568f-482f-b4ba-cdd9cfca0355/7/badge)
+
+![Build status](https://theazurechallenge.visualstudio.com/_apis/public/build/definitions/0928da5b-568f-482f-b4ba-cdd9cfca0355/7/badge)
 
 # Exchange
 
