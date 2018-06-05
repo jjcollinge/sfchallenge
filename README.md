@@ -1,3 +1,6 @@
+
+[![Build Status](https://theazurechallenge.visualstudio.com/_apis/public/build/definitions/0928da5b-568f-482f-b4ba-cdd9cfca0355/7/badge)
+
 # Exchange
 
 The Exchange application is a fabricated trading platform. It allows buyers and sellers to exchange values of currency between each other. The application has been designed and built around Service Fabric [Reliable Services](https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-reliable-services-introduction) and consists of 6 main components:
