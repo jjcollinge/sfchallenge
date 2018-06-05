@@ -53,7 +53,7 @@ namespace Logger
             // specifying the Swagger JSON endpoint.
             app.UseSwaggerUI(c =>
             {
-                c.SwaggerEndpoint("/Exchange/Logger/swagger/v1/swagger.json", "Logger API");
+                c.SwaggerEndpoint("swagger/v1/swagger.json", "Logger API");
             });
 
             app.UseMvc();

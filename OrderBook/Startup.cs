@@ -50,7 +50,7 @@ namespace OrderBook
             // specifying the Swagger JSON endpoint.
             app.UseSwaggerUI(c =>
             {
-                c.SwaggerEndpoint("/Exchange/OrderBook/swagger/v1/swagger.json", "OrderBook API");
+                c.SwaggerEndpoint("swagger/v1/swagger.json", "OrderBook API");
             });
 
             app.UseMvc();

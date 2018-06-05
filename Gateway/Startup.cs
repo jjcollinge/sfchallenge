@@ -12,9 +12,11 @@ using Common;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Rewrite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Swashbuckle.AspNetCore.Swagger;
 
 namespace Gateway
 {
@@ -26,6 +28,10 @@ namespace Gateway
 
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new Info { Title = "Gateway API", Version = "v1" });
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -35,6 +41,25 @@ namespace Gateway
             {
                 app.UseDeveloperExceptionPage();
             }
+
+            // Enable middleware to serve swagger-ui (HTML, JS, CSS, etc.), 
+            // specifying the Swagger JSON endpoint.
+            app.UseSwaggerUI(c =>
+            {
+                c.SwaggerEndpoint($"OrderBook/swagger/v1/swagger.json", "OrderBook API");
+                c.RoutePrefix = "orderbook";
+            });
+            app.UseSwaggerUI(c =>
+            {
+                c.SwaggerEndpoint($"Fulfillment/swagger/v1/swagger.json", "Fulfillment API");
+                c.RoutePrefix = "fulfillment";
+            });
+            app.UseSwaggerUI(c =>
+            {
+                c.SwaggerEndpoint($"Logger/swagger/v1/swagger.json", "Logger API");
+                c.RoutePrefix = "logger";
+            });
+
 
             // This is a simple proxy middleware that will detect whether a service
             // is partitioned or not and forward the request accordingly. This is 
@@ -62,16 +87,15 @@ namespace Gateway
                     // If the OrderBook is a singleton
                     if (partitioningScheme == PartitionScheme.Singleton)
                     {
-                        string forwardingUrl = ForwardingUrl(context, "OrderBook");
+                        string forwardingUrl = GetForwardingUrl(context, "OrderBook");
                         await ProxyRequestHelper(context, forwardingUrl);
-                        
                         return;
                     }
 
                     // If the OrderBook is using named partitions
                     if (partitioningScheme == PartitionScheme.Named && currency != string.Empty)
                     {
-                        string forwardingUrl = ForwardingUrl(context, "OrderBook");
+                        string forwardingUrl = GetForwardingUrl(context, "OrderBook");
                         var partitionedEndpoint = $"{forwardingUrl}?PartitionKey={currency}&PartitionKind=Named&Timeout={requestTimeout}";
                         await ProxyRequestHelper(context, partitionedEndpoint);
                         return;
@@ -85,7 +109,7 @@ namespace Gateway
                 {
                     // The Fulfillment service is Int64Range partitioned by default
                     // so we don't handle the singleton case.
-                    string forwardingUrl = ForwardingUrl(context, "Fulfillment");
+                    string forwardingUrl = GetForwardingUrl(context, "Fulfillment");
                     var partitionedEndpoint = new Uri($"{forwardingUrl}?PartitionKey=1&PartitionKind=Int64Range&Timeout={requestTimeout}");
 
                     // All requests through the gateway will hit a single partition of the 
@@ -104,7 +128,7 @@ namespace Gateway
                 // If the path matches the Logger api
                 if (IsLoggerServiceRequest(context))
                 {
-                    string forwardingUrl = ForwardingUrl(context, "Logger");
+                    string forwardingUrl = GetForwardingUrl(context, "Logger");
 
                     // All requests through the gateway will hit a single partition of the 
                     // logger service. This is because we only use it to query the DB count.
@@ -118,9 +142,24 @@ namespace Gateway
                         }
                     }
                 }
-                
-                throw new InvalidOperationException("Unexpected request path. This gateway only matches for the OrderBook, Fulfillment and Logger apis.");
+
+                return;
             });
+        }
+
+        private static string GetForwardingUrl(HttpContext context, string serviceName)
+        {
+            string forwardingUrl = string.Empty;
+            if (context.Request.Path.Value.Contains("swagger"))
+            {
+                forwardingUrl = ForwardingUrl(context, serviceName).Replace($"/{serviceName}/{serviceName.ToLower()}", "");
+            }
+            else
+            {
+                forwardingUrl = ForwardingUrl(context, serviceName);
+            }
+
+            return forwardingUrl;
         }
 
         private static async Task<System.Fabric.Description.PartitionScheme> GetOrderBookPartitioningScheme()
@@ -190,17 +229,17 @@ namespace Gateway
 
         private static bool IsOrderBookServiceRequest(HttpContext context)
         {
-            return context.Request.Path.Value.Contains("api/orders");
+            return context.Request.Path.Value.Contains("api/orders") || context.Request.Path.Value.Contains("OrderBook");
         }
 
         private static bool IsFulfillmentServiceRequest(HttpContext context)
         {
-            return context.Request.Path.Value.Contains("/api/user") || context.Request.Path.Value.Contains("/api/trades");
+            return context.Request.Path.Value.Contains("/api/user") || context.Request.Path.Value.Contains("/api/trades") || context.Request.Path.Value.Contains("Fulfillment");
         }
 
         private bool IsLoggerServiceRequest(HttpContext context)
         {
-            return context.Request.Path.Value.Contains("api/logger");
+            return context.Request.Path.Value.Contains("api/logger") || context.Request.Path.Value.Contains("Logger");
         }
 
         private static string ForwardingUrl(HttpContext context, string serviceName)
