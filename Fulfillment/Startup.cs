@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -46,13 +48,6 @@ namespace Fulfillment
                 c.PreSerializeFilters.Add((swaggerDoc, httpReq) => {
                     swaggerDoc.BasePath = "/Exchange/Fulfillment";
                 });
-            });
-
-            // Enable middleware to serve swagger-ui (HTML, JS, CSS, etc.), 
-            // specifying the Swagger JSON endpoint.
-            app.UseSwaggerUI(c =>
-            {
-                c.SwaggerEndpoint("/Exchange/Fulfillment/swagger/v1/swagger.json", "Fulfillment API");
             });
 
             app.UseMvc();
