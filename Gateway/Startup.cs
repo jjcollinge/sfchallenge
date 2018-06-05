@@ -48,16 +48,19 @@ namespace Gateway
             {
                 c.SwaggerEndpoint($"OrderBook/swagger/v1/swagger.json", "OrderBook API");
                 c.RoutePrefix = "orderbook";
+                c.SupportedSubmitMethods(new SubmitMethod[] { });
             });
             app.UseSwaggerUI(c =>
             {
                 c.SwaggerEndpoint($"Fulfillment/swagger/v1/swagger.json", "Fulfillment API");
                 c.RoutePrefix = "fulfillment";
+                c.SupportedSubmitMethods(new SubmitMethod[] { });
             });
             app.UseSwaggerUI(c =>
             {
                 c.SwaggerEndpoint($"Logger/swagger/v1/swagger.json", "Logger API");
                 c.RoutePrefix = "logger";
+                c.SupportedSubmitMethods(new SubmitMethod[] { });
             });
 
 
