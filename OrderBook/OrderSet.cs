@@ -38,6 +38,7 @@ namespace OrderBook
             this.stateManager = stateManager;
             this.setName = setName;
             this.stateManager.StateManagerChanged += this.OnStateManagerChangedHandler;
+            //this.stateManager.TransactionChanged += this.OnTransactionChangedHandler;
         }
 
         /// <summary>
@@ -383,7 +384,7 @@ namespace OrderBook
 
                 if (result.HasValue)
                 {
-                    
+
                     return true;
                 }
             }
@@ -506,11 +507,26 @@ namespace OrderBook
         /// <param name="e"></param>
         private void OnStateManagerChangedHandler(object sender, NotifyStateManagerChangedEventArgs e)
         {
-            if (e.Action == NotifyStateManagerChangedAction.Add)
+            if (e.Action == NotifyStateManagerChangedAction.Rebuild)
             {
-                this.ProcessStateManagerAddNotification(e);
+                ProcessStateManagerRebuildNotification(e);
                 return;
             }
+            if (e.Action == NotifyStateManagerChangedAction.Add)
+            {
+                ProcessStateManagerAddNotification(e);
+                return;
+            }
+        }
+
+        /// <summary>
+        /// Called in response to an rebuild  notification on the 
+        /// state manager.
+        /// </summary>
+        /// <param name="e"></param>
+        private void ProcessStateManagerRebuildNotification(NotifyStateManagerChangedEventArgs e)
+        {
+            // no-op
         }
 
         /// <summary>
@@ -542,23 +558,26 @@ namespace OrderBook
         /// <param name="e"></param>
         private void OnDictionaryChangedHandler(object sender, NotifyDictionaryChangedEventArgs<string, Order> e)
         {
-            if (e.Action == NotifyDictionaryChangedAction.Add)
+            switch (e.Action)
             {
-                var addEvent = e as NotifyDictionaryItemAddedEventArgs<string, Order>;
-                this.ProcessDictionaryAddNotification(addEvent);
-                return;
-            }
-            if (e.Action == NotifyDictionaryChangedAction.Update)
-            {
-                var updateEvent = e as NotifyDictionaryItemUpdatedEventArgs<string, Order>;
-                this.ProcessDictionaryUpdateNotification(updateEvent);
-                return;
-            }
-            if (e.Action == NotifyDictionaryChangedAction.Remove)
-            {
-                var removeEvent = e as NotifyDictionaryItemRemovedEventArgs<string, Order>;
-                this.ProcessDictionaryRemoveNotification(removeEvent);
-                return;
+                case NotifyDictionaryChangedAction.Clear:
+                    var clearEvent = e as NotifyDictionaryClearEventArgs<string, Order>;
+                    ProcessDictionaryClearNotification(clearEvent);
+                    return;
+                case NotifyDictionaryChangedAction.Add:
+                    var addEvent = e as NotifyDictionaryItemAddedEventArgs<string, Order>;
+                    ProcessDictionaryAddNotification(addEvent);
+                    return;
+                case NotifyDictionaryChangedAction.Update:
+                    var updateEvent = e as NotifyDictionaryItemUpdatedEventArgs<string, Order>;
+                    ProcessDictionaryUpdateNotification(updateEvent);
+                    return;
+                case NotifyDictionaryChangedAction.Remove:
+                    var removeEvent = e as NotifyDictionaryItemRemovedEventArgs<string, Order>;
+                    ProcessDictionaryRemoveNotification(removeEvent);
+                    return;
+                default:
+                    break;
             }
         }
 
@@ -585,6 +604,18 @@ namespace OrderBook
                 {
                     this.SecondaryIndex = this.SecondaryIndex.Add(enumerator.Current.Value);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Called when a dictionary has been cleared
+        /// </summary>
+        /// <param name="e"></param>
+        private void ProcessDictionaryClearNotification(NotifyDictionaryClearEventArgs<string, Order> e)
+        {
+            lock (this.lockObject)
+            {
+                this.SecondaryIndex = this.SecondaryIndex.Clear();
             }
         }
 
