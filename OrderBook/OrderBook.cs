@@ -120,10 +120,10 @@ namespace OrderBook
         /// </summary>
         /// <param name="order"></param>
         /// <returns></returns>
-        public async Task<string> AddAskAsync(Order order)
+        public async Task<string> AddAskAsync(Order order, CancellationToken cancellationToken = default(CancellationToken))
         {
             Validation.ThrowIfNotValidOrder(order);
-            var currentAsks = await asks.CountAsync();
+            var currentAsks = await asks.CountAsync(cancellationToken);
 
             // REQUIRED, DO NOT REMOVE.         
             if (currentAsks > maxPendingAsks)
@@ -132,7 +132,7 @@ namespace OrderBook
                 throw new MaxOrdersExceededException(currentAsks);
             }
 
-            await this.asks.AddOrderAsync(order);
+            await this.asks.AddOrderAsync(order, cancellationToken);
 
             MetricsLog?.AskCreated(order);
 
@@ -144,10 +144,10 @@ namespace OrderBook
         /// </summary>
         /// <param name="order"></param>
         /// <returns></returns>
-        public async Task<string> AddBidAsync(Order order)
+        public async Task<string> AddBidAsync(Order order, CancellationToken cancellationToken = default(CancellationToken))
         {
             Validation.ThrowIfNotValidOrder(order);
-            var currentBids = await bids.CountAsync();
+            var currentBids = await bids.CountAsync(cancellationToken);
 
             // REQUIRED, DO NOT REMOVE.         
             if (currentBids > maxPendingBids)
@@ -156,7 +156,7 @@ namespace OrderBook
                 throw new MaxOrdersExceededException(currentBids);
             }
 
-            await this.bids.AddOrderAsync(order);
+            await this.bids.AddOrderAsync(order, cancellationToken);
 
             MetricsLog?.BidCreated(order);
 
@@ -167,46 +167,46 @@ namespace OrderBook
         /// Gets all the current asks
         /// </summary>
         /// <returns></returns>
-        public async Task<List<KeyValuePair<string, Order>>> GetAsksAsync()
+        public async Task<List<KeyValuePair<string, Order>>> GetAsksAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
-            return await this.asks.GetOrdersAsync();
+            return await this.asks.GetOrdersAsync(cancellationToken);
         }
 
         /// <summary>
         /// Gets all the current bids
         /// </summary>
         /// <returns></returns>
-        public async Task<List<KeyValuePair<string, Order>>> GetBidsAsync()
+        public async Task<List<KeyValuePair<string, Order>>> GetBidsAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
-            return await this.bids.GetOrdersAsync();
+            return await this.bids.GetOrdersAsync(cancellationToken);
         }
 
         /// <summary>
         /// Returns current count of asks
         /// </summary>
         /// <returns></returns>
-        public async Task<long> CountAskAsync()
+        public async Task<long> CountAskAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
-            return await this.asks.CountAsync();
+            return await this.asks.CountAsync(cancellationToken);
         }
 
         /// <summary>
         /// Returns current count of bids
         /// </summary>
         /// <returns></returns>
-        public async Task<long> CountBidAsync()
+        public async Task<long> CountBidAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
-            return await this.bids.CountAsync();
+            return await this.bids.CountAsync(cancellationToken);
         }
 
         /// <summary>
         /// Drops all asks and bids
         /// </summary>
         /// <returns></returns>
-        public async Task ClearAllOrders()
+        public async Task ClearAllOrders(CancellationToken cancellationToken = default(CancellationToken))
         {
-            await this.bids.ClearAsync();
-            await this.asks.ClearAsync();
+            await this.bids.ClearAsync(cancellationToken);
+            await this.asks.ClearAsync(cancellationToken);
         }
 
         /// <summary>
@@ -281,38 +281,37 @@ namespace OrderBook
 
                 try
                 {
-                    // If the book can't make any matches then sleep to
-                    // prevent high idle CPU utilization when there are
-                    // no orders to process
-                    if (await bids.CountAsync() < 1 || await asks.CountAsync() < 1)
-                    {
-                        await Task.Delay(500, cancellationToken);
-                    }
-
                     // Get the maximum bid and minimum ask from our secondary index.
                     maxBid = this.bids.GetMaxOrder();
                     minAsk = this.asks.GetMinOrder();
 
-                    if (maxBid == null || minAsk == null)
+                    if (maxBid == null && minAsk == null)
                     {
+                        // Help avoid CPU spinning
+                        await Task.Delay(500, cancellationToken);
                         continue;
                     }
+                    if (maxBid != null)
+                    {
+                        // Enforce TTL: Remove unmatched bids after 5mins. 
+                        if (maxBid.Timestamp.AddMinutes(5) < DateTime.UtcNow)
+                        {
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Removing expired bid {maxBid.Id}");
 
-                    // Enforce TTL: Remove unmatched bids/asks after 5mins. 
-                    var hasBidTimedout = maxBid.Timestamp.AddMinutes(5) < DateTime.UtcNow;
-                    var hasAskTimedout = minAsk.Timestamp.AddMinutes(5) < DateTime.UtcNow;
-                    if (hasBidTimedout)
-                    {
-                        await this.bids.RemoveAsync(maxBid);
+                            await this.bids.RemoveAsync(maxBid, cancellationToken);
+                            maxBid = null;
+                        }
                     }
+                    if (minAsk != null)
+                    {
+                        // Enforce TTL: Remove unmatched asks after 5mins.
+                        if (minAsk.Timestamp.AddMinutes(5) < DateTime.UtcNow)
+                        {
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Removing expired asks {minAsk.Id}");
 
-                    if (hasAskTimedout)
-                    {
-                        await this.asks.RemoveAsync(minAsk);
-                    }
-                    if (hasBidTimedout || hasAskTimedout)
-                    {
-                        continue;
+                            await this.asks.RemoveAsync(minAsk, cancellationToken);
+                            minAsk = null;
+                        }
                     }
 
                     ServiceEventSource.Current.ServiceMessage(this.Context, $"Checking for new match");
@@ -334,16 +333,14 @@ namespace OrderBook
                         }
                         catch (InvalidAskException)
                         {
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Dropping invalid Asks");
-                            await this.asks.RemoveAsync(minAsk);
-                            await this.bids.RemoveAsync(maxBid); // In a real system we would leave the bid
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Dropping invalid Ask");
+                            await this.asks.RemoveAsync(minAsk, cancellationToken);
                             continue;
                         }
                         catch (InvalidBidException)
                         {
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Droping invalid Bids");
-                            await this.bids.RemoveAsync(maxBid);
-                            await this.asks.RemoveAsync(minAsk); // In a real system we would leave the ask
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Dropping invalid Bid");
+                            await this.asks.RemoveAsync(maxBid, cancellationToken);
                             continue;
                         }
 
@@ -351,7 +348,7 @@ namespace OrderBook
                         {
                             try
                             {
-                                await AddAskAsync(leftOverAsk); // Add the left over ask as a new order
+                                await AddAskAsync(leftOverAsk, cancellationToken); // Add the left over ask as a new order
                             }
                             catch (FabricNotPrimaryException ex)
                             {
@@ -445,12 +442,12 @@ namespace OrderBook
                         {
                             // Invalid request - fail the orders and 
                             // remove them from our order book.
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error resposne from fulfillment service '{res.StatusCode}'");
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error response from fulfillment service '{res.StatusCode}'");
 
                             using (var tx = this.StateManager.CreateTransaction())
                             {
-                                await this.asks.RemoveAsync(tx, minAsk);
-                                await this.bids.RemoveAsync(tx, maxBid);
+                                await this.asks.RemoveAsync(tx, minAsk, cancellationToken);
+                                await this.bids.RemoveAsync(tx, maxBid, cancellationToken);
                                 await tx.CommitAsync();
                             }
                             continue;
@@ -460,7 +457,7 @@ namespace OrderBook
                             // Transient error indicating the service
                             // has moved and needs to be re-resolved.
                             // Retry.
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error resposne from fulfillment service '{res.StatusCode}'");
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error response from fulfillment service '{res.StatusCode}'");
 
                             continue;
                         }
@@ -469,7 +466,7 @@ namespace OrderBook
                             // 429 is a custom error that indicates
                             // that the service is under heavy load.
                             // Back off and retry.
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error resposne from fulfillment service '{res.StatusCode}'");
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error response from fulfillment service '{res.StatusCode}'");
 
                             await BackOff(cancellationToken);
                             continue;
@@ -481,29 +478,21 @@ namespace OrderBook
                             {
 
                                 // If the response is successful, assume orders are safe to remove.
-                                var removedAsk = await this.asks.RemoveAsync(tx, minAsk);
-                                var removedBid = await this.bids.RemoveAsync(tx, maxBid);
-                                if (removedAsk && removedBid)
-                                {
-                                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Removed Ask {minAsk.Id} and Bid {maxBid.Id}");
-                                    await tx.CommitAsync(); // Committing our transaction will remove both the ask and the bid from our orders.
-
-                                    var tradeId = await res.Content.ReadAsStringAsync();
-                                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Created new trade with id '{tradeId}'");
-                                }
-                                else
-                                {
-                                    ServiceEventSource.Current.ServiceMessage(this.Context, $"Failed to remove orders, so requeuing");
-                                    tx.Abort(); // Abort the transaction to ensure both the ask and the bid stay in our orders.
-                                    continue;
-                                }
+                                await this.asks.RemoveAsync(tx, minAsk, cancellationToken);
+                                await this.bids.RemoveAsync(tx, maxBid, cancellationToken);
+                                
+                                await tx.CommitAsync(); // Committing our transaction will remove both the ask and the bid from our orders.
+                                ServiceEventSource.Current.ServiceMessage(this.Context, $"Removed Ask {minAsk.Id} and Bid {maxBid.Id}");
                             }
+
+                            var tradeId = await res.Content.ReadAsStringAsync();
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Created new trade with id '{tradeId}'");
                         }
                         else
                         {
                             // Unhandled error condition.
                             // Log it, back off and retry. 
-                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error resposne from fulfillment service '{res.StatusCode}'");
+                            ServiceEventSource.Current.ServiceMessage(this.Context, $"Error response from fulfillment service '{res.StatusCode}'");
 
                             await BackOff(cancellationToken);
                             continue;
