@@ -29,6 +29,8 @@ namespace OrderBook
         // mock reliable collection notifications are not implemented.
         public ImmutableSortedSet<Order> SecondaryIndex;
 
+        public object lockObject = new object();
+
         public OrderSet(IReliableStateManager stateManager, string setName)
         {
             this.SecondaryIndex = ImmutableSortedSet.Create<Order>();
@@ -146,7 +148,7 @@ namespace OrderBook
         {
             using (ITransaction tx = this.stateManager.CreateTransaction())
             {
-                await orders.TryAddAsync(tx, order.Id, order);
+                await orders.AddAsync(tx, order.Id, order);
                 await tx.CommitAsync();
             }
         }
@@ -169,7 +171,7 @@ namespace OrderBook
                 try
                 {
                     await ExecuteClearAsync(orders);
-                    lock (this.SecondaryIndex)
+                    lock (this.lockObject)
                     {
                         this.SecondaryIndex = this.SecondaryIndex.Clear();
                     }
@@ -252,7 +254,6 @@ namespace OrderBook
                 {
                     order = result.Value;
                 }
-                await tx.CommitAsync();
             }
             return order;
         }
@@ -263,7 +264,7 @@ namespace OrderBook
         /// <returns></returns>
         public Order GetMaxOrder()
         {
-            lock (this.SecondaryIndex)
+            lock (this.lockObject)
             {
                 return this.SecondaryIndex.LastOrDefault();
             }
@@ -275,7 +276,7 @@ namespace OrderBook
         /// <returns></returns>
         public Order GetMinOrder()
         {
-            lock (this.SecondaryIndex)
+            lock (this.lockObject)
             {
                 return this.SecondaryIndex.FirstOrDefault();
             }
@@ -378,9 +379,11 @@ namespace OrderBook
             using (var tx = this.stateManager.CreateTransaction())
             {
                 var result = await orders.TryRemoveAsync(tx, order.Id);
+                await tx.CommitAsync();
+
                 if (result.HasValue)
                 {
-                    await tx.CommitAsync();
+                    
                     return true;
                 }
             }
@@ -494,6 +497,8 @@ namespace OrderBook
             }
         }
 
+        #region Notification Handling
+
         /// <summary>
         /// Called in response to a change on the state manager 
         /// </summary>
@@ -568,7 +573,7 @@ namespace OrderBook
              IReliableDictionary<string, Order> origin,
              NotifyDictionaryRebuildEventArgs<string, Order> rebuildNotification)
         {
-            lock (this.SecondaryIndex)
+            lock (this.lockObject)
             {
                 this.SecondaryIndex = this.SecondaryIndex.Clear();
             }
@@ -576,7 +581,7 @@ namespace OrderBook
             var enumerator = rebuildNotification.State.GetAsyncEnumerator();
             while (await enumerator.MoveNextAsync(CancellationToken.None))
             {
-                lock (this.SecondaryIndex)
+                lock (this.lockObject)
                 {
                     this.SecondaryIndex = this.SecondaryIndex.Add(enumerator.Current.Value);
                 }
@@ -592,7 +597,7 @@ namespace OrderBook
         {
             if (e?.Value != null)
             {
-                lock (this.SecondaryIndex)
+                lock (this.lockObject)
                 {
                     this.SecondaryIndex = this.SecondaryIndex.Add(e.Value);
                 }
@@ -609,7 +614,7 @@ namespace OrderBook
         {
             if (e?.Value != null)
             {
-                lock (this.SecondaryIndex)
+                lock (this.lockObject)
                 {
                     var order = this.SecondaryIndex.
                         Where(x => x.Id == e.Value.Id).FirstOrDefault();
@@ -628,7 +633,7 @@ namespace OrderBook
         /// <param name="e"></param>
         private void ProcessDictionaryRemoveNotification(NotifyDictionaryItemRemovedEventArgs<string, Order> e)
         {
-            lock (this.SecondaryIndex)
+            lock (this.lockObject)
             {
                 var order = this.SecondaryIndex.Where(x => x.Id == e.Key).FirstOrDefault();
                 if (order != null)
@@ -638,4 +643,6 @@ namespace OrderBook
             }
         }
     }
+
+    #endregion
 }
