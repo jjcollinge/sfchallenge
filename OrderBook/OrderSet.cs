@@ -265,10 +265,7 @@ namespace OrderBook
         /// <returns></returns>
         public Order GetMaxOrder()
         {
-            lock (this.lockObject)
-            {
-                return this.SecondaryIndex.LastOrDefault();
-            }
+            return this.SecondaryIndex.LastOrDefault();
         }
 
         /// <summary>
@@ -277,10 +274,7 @@ namespace OrderBook
         /// <returns></returns>
         public Order GetMinOrder()
         {
-            lock (this.lockObject)
-            {
-                return this.SecondaryIndex.FirstOrDefault();
-            }
+            return this.SecondaryIndex.FirstOrDefault();
         }
 
         /// <summary>
