@@ -21,7 +21,6 @@ namespace OrderBook.Tests
             CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            // Task Cancelled Exception will be thrown during Task.Delay(500, cancellationToken);
             await Assert.ThrowsAsync<TaskCanceledException>(async () => await RunAsync(cts.Token));
             watch.Stop();
             var elapsedSec = watch.ElapsedMilliseconds / 1000;
@@ -40,8 +39,7 @@ namespace OrderBook.Tests
             await this.AddBidAsync(bid);
 
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            // Opertation cancelled exception will be thrown by cancellationToken.ThrowIfCancellationRequested();
-            await Assert.ThrowsAsync<OperationCanceledException>(async () => await RunAsync(cts.Token));
+            await Assert.ThrowsAsync<TaskCanceledException>(async () => await RunAsync(cts.Token));
             watch.Stop();
             var elapsedSec = watch.ElapsedMilliseconds / 1000;
 

@@ -76,7 +76,7 @@ namespace Fulfillment
         /// </summary>
         /// <param name="trade"></param>
         /// <returns></returns>
-        public async Task<string> AddTradeAsync(TradeRequestModel tradeRequest)
+        public async Task<string> AddTradeAsync(TradeRequestModel tradeRequest, CancellationToken cancellationToken = default(CancellationToken))
         {
             Validation.ThrowIfNotValidTradeRequest(tradeRequest);
 
@@ -88,7 +88,7 @@ namespace Fulfillment
                 throw new MaxPendingTradesExceededException(pendingTrades);
             }
 
-            var tradeId = await this.Trades.EnqueueAsync(tradeRequest, CancellationToken.None);
+            var tradeId = await this.Trades.EnqueueAsync(tradeRequest, cancellationToken);
             return tradeId;
         }
 
@@ -136,7 +136,7 @@ namespace Fulfillment
         /// </summary>
         /// <param name="userRequest"></param>
         /// <returns></returns>
-        public async Task<bool> UpdateUserAsync(UserRequestModel userRequest, CancellationToken cancellationToken)
+        public async Task<bool> UpdateUserAsync(UserRequestModel userRequest, CancellationToken cancellationToken = default(CancellationToken))
         {
             Validation.ThrowIfNotValidUserRequest(userRequest);
             var success = await this.Users.UpdateUserAsync(userRequest, cancellationToken);
@@ -148,7 +148,7 @@ namespace Fulfillment
         /// </summary>
         /// <param name="userId"></param>
         /// <returns></returns>
-        public async Task<User> GetUserAsync(string userId, CancellationToken cancellationToken)
+        public async Task<User> GetUserAsync(string userId, CancellationToken cancellationToken = default(CancellationToken))
         {
             return await this.Users.GetUserAsync(userId, cancellationToken);
         }
@@ -157,7 +157,7 @@ namespace Fulfillment
         /// Gets all users from the user store.
         /// </summary>
         /// <returns></returns>
-        public async Task<IEnumerable<User>> GetUsersAsync(CancellationToken cancellationToken)
+        public async Task<IEnumerable<User>> GetUsersAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
             return await this.Users.GetUsersAsync(cancellationToken);
         }
@@ -167,7 +167,7 @@ namespace Fulfillment
         /// </summary>
         /// <param name="userId"></param>
         /// <returns></returns>
-        public async Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken)
+        public async Task<bool> DeleteUserAsync(string userId, CancellationToken cancellationToken = default(CancellationToken))
         {
             return await this.Users.DeleteUserAsync(userId, cancellationToken);
         }
@@ -178,7 +178,7 @@ namespace Fulfillment
         /// </summary>
         /// <param name="trade"></param>
         /// <returns></returns>
-        private async Task AddTradeToLogAsync(Trade trade, CancellationToken cancellationToken)
+        private async Task AddTradeToLogAsync(Trade trade, CancellationToken cancellationToken = default(CancellationToken))
         {
             HttpResponseMessage res;
             try
