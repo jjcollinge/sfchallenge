@@ -107,7 +107,7 @@ namespace OrderBook
             reverseProxyPort = configurationPackage.Settings.Sections["ClusterConfig"].Parameters["ReverseProxy_Port"].Value;
 
             maxPendingAsks = int.Parse(configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
-            maxPendingBids = int.Parse(configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxAsksPending"].Value);
+            maxPendingBids = int.Parse(configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["MaxBidsPending"].Value);
 
             // Metrics used to compare team performance and reliability against each other
             var metricsInstrumentationKey = configurationPackage.Settings.Sections["OrderBookConfig"].Parameters["Admin_AppInsights_InstrumentationKey"].Value;
