@@ -67,7 +67,7 @@ namespace Logger
         /// </summary>
         /// <param name="trade"></param>
         /// <returns></returns>
-        public async Task LogAsync(Trade trade, CancellationToken cancellationToken)
+        public async Task LogAsync(Trade trade, CancellationToken cancellationToken = default(CancellationToken))
         {
             IReliableConcurrentQueue<Trade> trades =
              await this.StateManager.GetOrAddAsync<IReliableConcurrentQueue<Trade>>(QueueName);
@@ -81,7 +81,7 @@ namespace Logger
 
                 try
                 {
-                    await executeAddTradeAsync(trade, trades, cancellationToken);
+                    await ExecuteAddTradeAsync(trade, trades, cancellationToken);
                     executed = true;
                 }
                 catch (TimeoutException ex)
@@ -103,7 +103,7 @@ namespace Logger
                     exceptions);
         }
 
-        private async Task executeAddTradeAsync(Trade trade, IReliableConcurrentQueue<Trade> exportQueue, CancellationToken cancellationToken)
+        private async Task ExecuteAddTradeAsync(Trade trade, IReliableConcurrentQueue<Trade> exportQueue, CancellationToken cancellationToken)
         {
             using (var tx = this.StateManager.CreateTransaction())
             {
@@ -120,7 +120,7 @@ namespace Logger
             return trades.Count;
         }
 
-        public async Task<long> LoggedTradeCountAsync(CancellationToken cancellationToken)
+        public async Task<long> LoggedTradeCountAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
             return await tradeLogger.CountAsync(cancellationToken);
         }
@@ -241,11 +241,9 @@ namespace Logger
                                         services => services
                                             .AddSingleton<StatefulServiceContext>(serviceContext)
                                             .AddSingleton<IReliableStateManager>(this.StateManager)
-                                            .AddSingleton<Logger>(this)
-                                            .AddSingleton<ITelemetryInitializer>((serviceProvider) => FabricTelemetryInitializerExtension.CreateFabricTelemetryInitializer(serviceContext)))
+                                            .AddSingleton<Logger>(this))
                                     .UseContentRoot(Directory.GetCurrentDirectory())
                                     .UseStartup<Startup>()
-                                    .UseApplicationInsights()
                                     .UseServiceFabricIntegration(listener, ServiceFabricIntegrationOptions.UseReverseProxyIntegration)
                                     .UseUrls(url)
                                     .Build();

@@ -27,8 +27,7 @@ namespace Fulfillment.Controllers
         {
             try
             {
-                var ct = new CancellationTokenSource(TimeSpan.FromSeconds(15)).Token;
-                var users = await this.fulfillment.GetUsersAsync(ct);
+                var users = await this.fulfillment.GetUsersAsync();
                 return this.Json(users);
             }
             catch (FabricException)
@@ -43,8 +42,7 @@ namespace Fulfillment.Controllers
         {
             try
             {
-                var ct = new CancellationTokenSource(TimeSpan.FromSeconds(15)).Token;
-                var user = await this.fulfillment.GetUserAsync(id, ct);
+                var user = await this.fulfillment.GetUserAsync(id);
                 if (user == null)
                 {
                     return this.NotFound();
@@ -86,7 +84,7 @@ namespace Fulfillment.Controllers
         {
             try
             {
-                var success = await this.fulfillment.UpdateUserAsync(userRequest, CancellationToken.None);
+                var success = await this.fulfillment.UpdateUserAsync(userRequest);
                 return this.Ok(success);
             }
             catch (InvalidUserRequestException ex)
@@ -109,7 +107,7 @@ namespace Fulfillment.Controllers
         {
             try
             {
-                var removed = await this.fulfillment.DeleteUserAsync(id, CancellationToken.None);
+                var removed = await this.fulfillment.DeleteUserAsync(id);
                 if (!removed)
                 {
                     return this.NotFound();

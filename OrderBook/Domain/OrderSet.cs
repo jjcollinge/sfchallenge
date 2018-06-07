@@ -5,6 +5,7 @@ using Microsoft.ServiceFabric.Data.Notifications;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Fabric;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,6 +29,8 @@ namespace OrderBook
         // mock reliable collection notifications are not implemented.
         public ImmutableSortedSet<Order> SecondaryIndex;
 
+        public object lockObject = new object();
+
         public OrderSet(IReliableStateManager stateManager, string setName)
         {
             this.SecondaryIndex = ImmutableSortedSet.Create<Order>();
@@ -35,6 +38,7 @@ namespace OrderBook
             this.stateManager = stateManager;
             this.setName = setName;
             this.stateManager.StateManagerChanged += this.OnStateManagerChangedHandler;
+            //this.stateManager.TransactionChanged += this.OnTransactionChangedHandler;
         }
 
         /// <summary>
@@ -43,7 +47,39 @@ namespace OrderBook
         /// pairs.
         /// </summary>
         /// <returns></returns>
-        public async Task<List<KeyValuePair<string, Order>>> GetOrdersAsync()
+        public async Task<List<KeyValuePair<string, Order>>> GetOrdersAsync(CancellationToken cancellationToken)
+        {
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    return await ExecuteGetOrdersAsync();
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to get orders",
+                    exceptions);
+            return new List<KeyValuePair<string, Order>>();
+        }
+
+        private async Task<List<KeyValuePair<string, Order>>> ExecuteGetOrdersAsync()
         {
             List<KeyValuePair<string, Order>> result = new List<KeyValuePair<string, Order>>();
 
@@ -74,29 +110,95 @@ namespace OrderBook
         /// </summary>
         /// <param name="order"></param>
         /// <returns></returns>
-        public async Task AddOrderAsync(Order order)
+        public async Task AddOrderAsync(Order order, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, Order> orders =
                 await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
 
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    await ExecuteAddOrderAsync(order, orders);
+                    return;
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add order",
+                    exceptions);
+        }
+
+        private async Task ExecuteAddOrderAsync(Order order, IReliableDictionary<string, Order> orders)
+        {
             using (ITransaction tx = this.stateManager.CreateTransaction())
             {
-                await orders.TryAddAsync(tx, order.Id, order);
+                await orders.AddAsync(tx, order.Id, order);
                 await tx.CommitAsync();
             }
-            return;
         }
 
         /// <summary>
         /// Clears all orders from dictionary
         /// </summary>
         /// <returns></returns>
-        public async Task ClearAsync()
+        public async Task ClearAsync(CancellationToken cancellationToken)
         {
             IReliableDictionary<string, Order> orders =
                 await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
 
-            this.SecondaryIndex = this.SecondaryIndex.Clear();
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    await ExecuteClearAsync(orders);
+                    lock (this.lockObject)
+                    {
+                        this.SecondaryIndex = this.SecondaryIndex.Clear();
+                    }
+                    return;
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to clear orders",
+                    exceptions);
+        }
+
+        private async Task ExecuteClearAsync(IReliableDictionary<string, Order> orders)
+        {
             using (ITransaction tx = this.stateManager.CreateTransaction())
             {
                 await orders.ClearAsync();
@@ -108,11 +210,43 @@ namespace OrderBook
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        private async Task<Order> GetOrderAsync(string id)
+        private async Task<Order> GetOrderAsync(string id, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, Order> orders =
                 await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
 
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    return await ExecuteGetOrderAsync(id, orders);
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add trade",
+                    exceptions);
+            return null;
+        }
+
+        private async Task<Order> ExecuteGetOrderAsync(string id, IReliableDictionary<string, Order> orders)
+        {
             Order order = null;
             using (ITransaction tx = this.stateManager.CreateTransaction())
             {
@@ -121,7 +255,6 @@ namespace OrderBook
                 {
                     order = result.Value;
                 }
-                await tx.CommitAsync();
             }
             return order;
         }
@@ -149,11 +282,43 @@ namespace OrderBook
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public async Task<long> CountAsync()
+        public async Task<long> CountAsync(CancellationToken cancellationToken)
         {
             IReliableDictionary<string, Order> orders =
                 await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
 
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    return await ExecuteCountAsync(orders);
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add trade",
+                    exceptions);
+            return 0;
+        }
+
+        private async Task<long> ExecuteCountAsync(IReliableDictionary<string, Order> orders)
+        {
             long count = 0;
             using (ITransaction tx = this.stateManager.CreateTransaction())
             {
@@ -169,20 +334,51 @@ namespace OrderBook
         /// </summary>
         /// <param name="order"></param>
         /// <returns></returns>
-        public async Task<bool> RemoveAsync(Order order)
+        public async Task<bool> RemoveAsync(Order order, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, Order> orders =
                 await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
 
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    return await ExecuteRemoveAsync(order, orders);
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add trade",
+                    exceptions);
+            return false;
+        }
+
+        private async Task<bool> ExecuteRemoveAsync(Order order, IReliableDictionary<string, Order> orders)
+        {
             using (var tx = this.stateManager.CreateTransaction())
             {
                 var result = await orders.TryRemoveAsync(tx, order.Id);
+                await tx.CommitAsync();
+
                 if (result.HasValue)
                 {
-                    lock (this.SecondaryIndex)
-                    {
-                        this.SecondaryIndex = this.SecondaryIndex.Remove(order);
-                    }
+
                     return true;
                 }
             }
@@ -194,22 +390,54 @@ namespace OrderBook
         /// and secondary index. Uses existing
         /// transaction that will be handled by
         /// the caller.
+        /// NOTE: We cannot guarentee the tx will
+        /// be committed so the secondary index
+        /// must be updated outside this
+        /// function.
         /// </summary>
         /// <param name="tx"></param>
         /// <param name="order"></param>
         /// <returns></returns>
-        public async Task<bool> RemoveAsync(ITransaction tx, Order order)
+        public async Task<bool> RemoveAsync(ITransaction tx, Order order, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, Order> orders =
                 await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
 
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    return await ExecuteRemoveAsync(tx, order, orders);
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add trade",
+                    exceptions);
+            return false;
+        }
+
+        private static async Task<bool> ExecuteRemoveAsync(ITransaction tx, Order order, IReliableDictionary<string, Order> orders)
+        {
             var result = await orders.TryRemoveAsync(tx, order.Id);
             if (result.HasValue)
             {
-                lock (this.SecondaryIndex)
-                {
-                    this.SecondaryIndex = this.SecondaryIndex.Remove(order);
-                }
                 return true;
             }
             return false;
@@ -221,16 +449,50 @@ namespace OrderBook
         /// </summary>
         /// <param name="orderId"></param>
         /// <returns></returns>
-        public async Task<bool> ContainsAsync(string orderId)
+        public async Task<bool> ContainsAsync(string orderId, CancellationToken cancellationToken)
         {
             IReliableDictionary<string, Order> orders =
                 await this.stateManager.GetOrAddAsync<IReliableDictionary<string, Order>>(this.setName);
 
+            var retryCount = 0;
+            List<Exception> exceptions = new List<Exception>();
+            while (retryCount < 3)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    return await ExecuteContainsAsync(orderId, orders);
+                }
+                catch (TimeoutException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+                catch (TransactionFaultedException ex)
+                {
+                    exceptions.Add(ex);
+                    retryCount++;
+                    continue;
+                }
+            }
+            if (exceptions.Count > 0)
+                throw new AggregateException(
+                    "Encounted errors while trying to add trade",
+                    exceptions);
+            return false;
+        }
+
+        private async Task<bool> ExecuteContainsAsync(string orderId, IReliableDictionary<string, Order> orders)
+        {
             using (var tx = this.stateManager.CreateTransaction())
             {
                 return await orders.ContainsKeyAsync(tx, orderId);
             }
         }
+
+        #region Notification Handling
 
         /// <summary>
         /// Called in response to a change on the state manager 
@@ -239,11 +501,26 @@ namespace OrderBook
         /// <param name="e"></param>
         private void OnStateManagerChangedHandler(object sender, NotifyStateManagerChangedEventArgs e)
         {
-            if (e.Action == NotifyStateManagerChangedAction.Add)
+            if (e.Action == NotifyStateManagerChangedAction.Rebuild)
             {
-                this.ProcessStateManagerAddNotification(e);
+                ProcessStateManagerRebuildNotification(e);
                 return;
             }
+            if (e.Action == NotifyStateManagerChangedAction.Add)
+            {
+                ProcessStateManagerAddNotification(e);
+                return;
+            }
+        }
+
+        /// <summary>
+        /// Called in response to an rebuild  notification on the 
+        /// state manager.
+        /// </summary>
+        /// <param name="e"></param>
+        private void ProcessStateManagerRebuildNotification(NotifyStateManagerChangedEventArgs e)
+        {
+            // no-op
         }
 
         /// <summary>
@@ -275,25 +552,27 @@ namespace OrderBook
         /// <param name="e"></param>
         private void OnDictionaryChangedHandler(object sender, NotifyDictionaryChangedEventArgs<string, Order> e)
         {
-            if (e.Action == NotifyDictionaryChangedAction.Add)
+            switch (e.Action)
             {
-                var addEvent = e as NotifyDictionaryItemAddedEventArgs<string, Order>;
-                this.ProcessDictionaryAddNotification(addEvent);
-                return;
+                case NotifyDictionaryChangedAction.Clear:
+                    var clearEvent = e as NotifyDictionaryClearEventArgs<string, Order>;
+                    ProcessDictionaryClearNotification(clearEvent);
+                    return;
+                case NotifyDictionaryChangedAction.Add:
+                    var addEvent = e as NotifyDictionaryItemAddedEventArgs<string, Order>;
+                    ProcessDictionaryAddNotification(addEvent);
+                    return;
+                case NotifyDictionaryChangedAction.Update:
+                    var updateEvent = e as NotifyDictionaryItemUpdatedEventArgs<string, Order>;
+                    ProcessDictionaryUpdateNotification(updateEvent);
+                    return;
+                case NotifyDictionaryChangedAction.Remove:
+                    var removeEvent = e as NotifyDictionaryItemRemovedEventArgs<string, Order>;
+                    ProcessDictionaryRemoveNotification(removeEvent);
+                    return;
+                default:
+                    break;
             }
-            if (e.Action == NotifyDictionaryChangedAction.Update)
-            {
-                var updateEvent = e as NotifyDictionaryItemUpdatedEventArgs<string, Order>;
-                this.ProcessDictionaryUpdateNotification(updateEvent);
-                return;
-            }
-            if (e.Action == NotifyDictionaryChangedAction.Remove)
-            {
-                var removeEvent = e as NotifyDictionaryItemRemovedEventArgs<string, Order>;
-                this.ProcessDictionaryRemoveNotification(removeEvent);
-                return;
-            }
-
         }
 
         /// <summary>
@@ -307,15 +586,30 @@ namespace OrderBook
              IReliableDictionary<string, Order> origin,
              NotifyDictionaryRebuildEventArgs<string, Order> rebuildNotification)
         {
-            this.SecondaryIndex = this.SecondaryIndex.Clear();
+            lock (this.lockObject)
+            {
+                this.SecondaryIndex = this.SecondaryIndex.Clear();
+            }
 
             var enumerator = rebuildNotification.State.GetAsyncEnumerator();
             while (await enumerator.MoveNextAsync(CancellationToken.None))
             {
-                lock (this.SecondaryIndex)
+                lock (this.lockObject)
                 {
                     this.SecondaryIndex = this.SecondaryIndex.Add(enumerator.Current.Value);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Called when a dictionary has been cleared
+        /// </summary>
+        /// <param name="e"></param>
+        private void ProcessDictionaryClearNotification(NotifyDictionaryClearEventArgs<string, Order> e)
+        {
+            lock (this.lockObject)
+            {
+                this.SecondaryIndex = this.SecondaryIndex.Clear();
             }
         }
 
@@ -328,7 +622,7 @@ namespace OrderBook
         {
             if (e?.Value != null)
             {
-                lock (this.SecondaryIndex)
+                lock (this.lockObject)
                 {
                     this.SecondaryIndex = this.SecondaryIndex.Add(e.Value);
                 }
@@ -345,9 +639,14 @@ namespace OrderBook
         {
             if (e?.Value != null)
             {
-                lock (this.SecondaryIndex)
+                lock (this.lockObject)
                 {
-                    this.SecondaryIndex = this.SecondaryIndex.Add(e.Value);
+                    var order = this.SecondaryIndex.
+                        Where(x => x.Id == e.Value.Id).FirstOrDefault();
+                    if (order != null)
+                    {
+                        this.SecondaryIndex = this.SecondaryIndex.Remove(order).Add(e.Value);
+                    }
                 }
             }
         }
@@ -359,14 +658,16 @@ namespace OrderBook
         /// <param name="e"></param>
         private void ProcessDictionaryRemoveNotification(NotifyDictionaryItemRemovedEventArgs<string, Order> e)
         {
-            var order = this.SecondaryIndex.Where(x => x.Id == e.Key).FirstOrDefault();
-            if (order != null)
+            lock (this.lockObject)
             {
-                lock (this.SecondaryIndex)
+                var order = this.SecondaryIndex.Where(x => x.Id == e.Key).FirstOrDefault();
+                if (order != null)
                 {
                     this.SecondaryIndex = this.SecondaryIndex.Remove(order);
                 }
             }
         }
     }
+
+    #endregion
 }

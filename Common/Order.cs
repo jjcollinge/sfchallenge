@@ -159,6 +159,16 @@ namespace Common
         public readonly DateTime Timestamp;
 
         #region Compare and Equals Methods
+
+        /// <summary>
+        /// Compare is used when sorting the orders.
+        /// We compare by checking the following criteria:
+        /// 1. Order magnitude
+        /// 2. Order timestamp
+        /// 3. Order ID
+        /// </summary>
+        /// <param name="other"></param>
+        /// <returns></returns>
         public int Compare(Order x, Order y)
         {
             var xSize = x.Amount * x.Price;
@@ -169,11 +179,25 @@ namespace Common
             }
             if (xSize == ySize)
             {
-                return DateTime.Compare(x.Timestamp, y.Timestamp) * -1;
+                var timeComparison = DateTime.Compare(x.Timestamp, y.Timestamp) * -1;
+                if (timeComparison != 0)
+                {
+                    return timeComparison;
+                }
+                return string.Compare(x.Id, y.Id);
             }
             return -1;
         }
 
+        /// <summary>
+        /// CompareTo is used when sorting the orders.
+        /// We compare by checking the following criteria:
+        /// 1. Order magnitude
+        /// 2. Order timestamp
+        /// 3. Order ID
+        /// </summary>
+        /// <param name="other"></param>
+        /// <returns></returns>
         public int CompareTo(Order other)
         {
             var xSize = Amount * Price;
@@ -184,11 +208,21 @@ namespace Common
             }
             if (xSize == ySize)
             {
-                return DateTime.Compare(Timestamp, other.Timestamp) * -1;
+                var timeComparison = (DateTime.Compare(Timestamp, other.Timestamp) * -1);
+                if (timeComparison != 0)
+                {
+                    return timeComparison;
+                }
+                return string.Compare(this.Id, other.Id);
             }
             return -1;
         }
 
+        /// <summary>
+        /// Equals to when equality operators are applied
+        /// to the Order object.
+        /// <param name="other"></param>
+        /// <returns></returns>
         public bool Equals(Order other)
         {
             if (other == null) return false;
@@ -200,6 +234,11 @@ namespace Common
                 Timestamp == other.Timestamp;
         }
 
+        /// <summary>
+        /// Equals to when equality operators are applied
+        /// to the Order object.
+        /// <param name="other"></param>
+        /// <returns></returns>
         public override bool Equals(object obj)
         {
             if (ReferenceEquals(null, obj)) return false;
@@ -208,6 +247,11 @@ namespace Common
             return Equals(obj as Order);
         }
 
+        /// <summary>
+        /// GetHashCode will be used to uniquely
+        /// identify the Order in a collection.
+        /// </summary>
+        /// <returns></returns>
         public override int GetHashCode()
         {
             return new { Id, Pair, Amount, Price, Timestamp, UserId }.GetHashCode();

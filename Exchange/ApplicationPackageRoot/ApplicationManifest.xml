@@ -1,8 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ApplicationManifest xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ApplicationTypeName="ExchangeType" ApplicationTypeVersion="1.0.0" xmlns="http://schemas.microsoft.com/2011/01/fabric">
   <Parameters>
-    <!--Metrics used to compare team performance and reliability against each other-->
-    <Parameter Name="Metrics_AppInsights_InstrumentationKey" DefaultValue="" />
+    <!-- Enter you team's name-->
     <Parameter Name="TeamName" DefaultValue="" />
     <!-- Cluster parameters -->
     <Parameter Name="ReverseProxy_Port" DefaultValue="19081" />
@@ -16,7 +15,6 @@
     <Parameter Name="MongoEnableSSL" DefaultValue="false" />
     <!-- Gateway parameters -->
     <Parameter Name="Gateway_InstanceCount" DefaultValue="1" />
-    <Parameter Name="Logger_Port" DefaultValue="9082" />
     <!-- UserStore parameters -->
     <Parameter Name="UserStore_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="UserStore_PartitionCount" DefaultValue="1" />
@@ -25,21 +23,13 @@
     <Parameter Name="Fulfillment_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="Fulfillment_PartitionCount" DefaultValue="1" />
     <Parameter Name="Fulfillment_TargetReplicaSetSize" DefaultValue="3" />
-    <Parameter Name="Fulfillment_Port" DefaultValue="9080" />
-    <!--
-    You have an SLA with management to block new trades when 800 existing trades are pending
-    Changing this value with fail a system audit. Other approaches much be used to scale 
-    -->
-    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="800" />
     <!-- OrderBook parameters -->
     <Parameter Name="OrderBook_MinReplicaSetSize" DefaultValue="3" />
     <Parameter Name="OrderBook_PartitionCount" DefaultValue="1" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" DefaultValue="3" />
-    <Parameter Name="OrderBook_Port" DefaultValue="9081" />
-    <!--
-    You have an SLA with management to block new orders when 700 existing orders are pending
-    Changing this value with fail a system audit. Other approaches much be used to scale 
-    -->
+    <!-- The following parameters are defined by the adminstrators, do not change or remove -->
+    <Parameter Name="Admin_AppInsights_InstrumentationKey" DefaultValue="" />
+    <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="800" />
     <Parameter Name="OrderBook_MaxBidsPending" DefaultValue="700" />
     <Parameter Name="OrderBook_MaxAsksPending" DefaultValue="700" />
   </Parameters>
@@ -60,11 +50,6 @@
         </Settings>
       </ConfigOverride>
     </ConfigOverrides>
-    <ResourceOverrides>
-      <Endpoints>
-        <Endpoint Name="ServiceEndpoint" Port="[Logger_Port]" />
-      </Endpoints>
-    </ResourceOverrides>
   </ServiceManifestImport>
   <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="GatewayPkg" ServiceManifestVersion="1.0.0" />
@@ -76,7 +61,7 @@
       <ConfigOverride Name="Config">
         <Settings>
           <Section Name="UserStoreConfig">
-            <Parameter Name="Metrics_AppInsights_InstrumentationKey" Value="[Metrics_AppInsights_InstrumentationKey]" />
+            <Parameter Name="Admin_AppInsights_InstrumentationKey" Value="[Admin_AppInsights_InstrumentationKey]" />
             <Parameter Name="TeamName" Value="[TeamName]" />
           </Section>
         </Settings>
@@ -94,17 +79,12 @@
           <Section Name="ClusterConfig">
             <Parameter Name="ReverseProxy_Port" Value="[ReverseProxy_Port]" />
             <Parameter Name="MaxTradesPending" Value="[Fulfillment_MaxTradesPending]" />
-            <Parameter Name="Metrics_AppInsights_InstrumentationKey" Value="[Metrics_AppInsights_InstrumentationKey]" />
+            <Parameter Name="Admin_AppInsights_InstrumentationKey" Value="[Admin_AppInsights_InstrumentationKey]" />
             <Parameter Name="TeamName" Value="[TeamName]" />
           </Section>
         </Settings>
       </ConfigOverride>
     </ConfigOverrides>
-    <ResourceOverrides>
-      <Endpoints>
-        <Endpoint Name="ServiceEndpoint" Port="[Fulfillment_Port]" />
-      </Endpoints>
-    </ResourceOverrides>
   </ServiceManifestImport>
   <ServiceManifestImport>
     <ServiceManifestRef ServiceManifestName="OrderBookPkg" ServiceManifestVersion="1.0.0" />
@@ -117,17 +97,12 @@
           <Section Name="OrderBookConfig">
             <Parameter Name="MaxBidsPending" Value="[OrderBook_MaxBidsPending]" />
             <Parameter Name="MaxAsksPending" Value="[OrderBook_MaxAsksPending]" />
-            <Parameter Name="Metrics_AppInsights_InstrumentationKey" Value="[Metrics_AppInsights_InstrumentationKey]" />
+            <Parameter Name="Admin_AppInsights_InstrumentationKey" Value="[Admin_AppInsights_InstrumentationKey]" />
             <Parameter Name="TeamName" Value="[TeamName]" />
           </Section>
         </Settings>
       </ConfigOverride>
     </ConfigOverrides>
-    <ResourceOverrides>
-      <Endpoints>
-        <Endpoint Name="ServiceEndpoint" Port="[OrderBook_Port]" />
-      </Endpoints>
-    </ResourceOverrides>
   </ServiceManifestImport>
   <DefaultServices>
     <!-- Create Gateway Service -->

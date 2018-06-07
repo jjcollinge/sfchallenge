@@ -26,7 +26,7 @@ namespace Logger.Controllers
         {
             try
             {
-                await this.logger.LogAsync(trade, CancellationToken.None);
+                await this.logger.LogAsync(trade);
                 return this.Ok();
             }
             catch (FabricNotPrimaryException)
@@ -64,8 +64,7 @@ namespace Logger.Controllers
         [HttpGet]
         public async Task<IActionResult> GetTradesAsync()
         {
-            var ct = new CancellationTokenSource(TimeSpan.FromSeconds(15)).Token;
-            var count = await this.logger.LoggedTradeCountAsync(ct);
+            var count = await this.logger.LoggedTradeCountAsync();
             return this.Ok(count);
         }
     }
