@@ -28,7 +28,7 @@
     <Parameter Name="OrderBook_PartitionCount" DefaultValue="1" />
     <Parameter Name="OrderBook_TargetReplicaSetSize" DefaultValue="3" />
     <!-- The following parameters are defined by the adminstrators, do not change or remove -->
-    <Parameter Name="Admin_AppInsights_InstrumentationKey" DefaultValue="0e533f02-1e64-405c-afc6-9e3bfb62686b" />
+    <Parameter Name="Admin_AppInsights_InstrumentationKey" DefaultValue="" />
     <Parameter Name="Fulfillment_MaxTradesPending" DefaultValue="800" />
     <Parameter Name="OrderBook_MaxBidsPending" DefaultValue="700" />
     <Parameter Name="OrderBook_MaxAsksPending" DefaultValue="700" />
