@@ -28,17 +28,17 @@ Timeout for the script to complete
 #>
 Param(
     [string]
-    $domain="localhost:19081",
+    $domain = "localhost:19081",
     [int]
-    $numTrades=100,
+    $numTrades = 100,
     [bool]
-    $useAllCurrencies=$False,
+    $useAllCurrencies = $False,
     [int]
-    $requestTimeoutSec=20,
+    $requestTimeoutSec = 20,
     [int]
-    $completeTimeoutSec=240,
-	[bool]
-	$isSingleton=$True
+    $completeTimeoutSec = 240,
+    [bool]
+    $isSingleton = $True
 )
 
 $ErrorActionPreference = "Stop";
@@ -56,54 +56,62 @@ $user2Fixture = ".\fixtures\user2.json"
 $orderFixturePrefix = ".\fixtures\order"
 $orderFixtureSuffix = "json"
 
-function log
-{
+function log {
     Param ([string] $message)
     $time = (Get-Date).ToString('MM/dd/yyyy hh:mm:ss tt')
     Write-Host "[${time}] ${message}"
 }
 
-function createUserFromFixture($fixturePath)
-{
+function createUserFromFixture($fixturePath) {
     $user = (Get-Content $fixturePath | Out-String)
     $userId = Invoke-RestMethod -Method Post -Uri $usersEndpoint -Body $user -ContentType "application/json" -TimeoutSec $requestTimeoutSec
     log "Created user ${userId} from ${fixturePath}"
     return $userId
 }
 
-function createAskForUserFromFixture($index, $userId)
-{
+function createAskForUserFromFixture($index, $userId) {
     $fixturePath = "${orderFixturePrefix}.${index}.${orderFixtureSuffix}"
     $order = (Get-Content $fixturePath | Out-String | ConvertFrom-Json)
     $order.userId = $userId
-	$currencyPair = $order.pair
+    $currencyPair = $order.pair
     $orderJSON = ($order | ConvertTo-Json)
-    $askOrderId = Invoke-RestMethod -Method Post -Uri "${askEndpoint}/${currencyPair}" -Body $orderJSON -ContentType "application/json" -TimeoutSec $requestTimeoutSec
+    $askOrderId = $null
+    Try {
+        $askOrderId = Invoke-RestMethod -Method Post -Uri "${askEndpoint}/${currencyPair}" -Body $orderJSON -ContentType "application/json" -TimeoutSec $requestTimeoutSec
+    }
+    Catch {
+        log "Error creating ask {$_}"
+        throw $_
+    }
     log "Created ask ${askOrderId} from ${fixturePath}"
     return $askOrderId
 }
 
-function createBidForUserFromFixture($index, $userId)
-{
+function createBidForUserFromFixture($index, $userId) {
     $fixturePath = "${orderFixturePrefix}.${index}.${orderFixtureSuffix}"
     $order = (Get-Content $fixturePath | Out-String | ConvertFrom-Json)
     $order.userId = $userId
-	$currencyPair = $order.pair
+    $currencyPair = $order.pair
     $orderJSON = ($order | ConvertTo-Json)
-    $bidOrderId = Invoke-RestMethod -Method Post -Uri "${bidEndpoint}/${currencyPair}" -Body $orderJSON -ContentType "application/json" -TimeoutSec $requestTimeoutSec
+    $bidOrderId = $null
+    Try {
+        $bidOrderId = Invoke-RestMethod -Method Post -Uri "${bidEndpoint}/${currencyPair}" -Body $orderJSON -ContentType "application/json" -TimeoutSec $requestTimeoutSec
+    }
+    Catch {
+        log "Error creating bid {$_}"
+        throw $_
+    }
     log "Created bid ${bidOrderId} from ${fixturePath}"
     return $bidOrderId
 }
 
-if (($useAllCurrencies -eq $False) -and ($isSingleton -eq $False))
-{
-	log "Error: Invalid configuration"
-	log "Reason: If you have a partitioned service, you must use ensure the 'useAllCurrencies' parameter is set to True!"
-	exit
+if (($useAllCurrencies -eq $False) -and ($isSingleton -eq $False)) {
+    log "Error: Invalid configuration"
+    log "Reason: If you have a partitioned service, you must use ensure the 'useAllCurrencies' parameter is set to True!"
+    exit
 }
-if ($isSingleton -eq $True)
-{
-	log "Info: If your OrderBook service is partitioned, please ensure the configuration value 'isSingleton' is set to False!"
+if ($isSingleton -eq $True) {
+    log "Info: If your OrderBook service is partitioned, please ensure the configuration value 'isSingleton' is set to False!"
 }
 
 $startTime = $(get-date)
@@ -114,12 +122,10 @@ $user2Id = createUserFromFixture $user2Fixture
 $initialTradeCount = (Invoke-RestMethod -Method Get -Uri "${loggerEndpoint}")
 $targetTradeCount = $initialTradeCount + $numTrades
 
-for ($i = 0; $i -lt $numTrades; $i++)
-{   
+for ($i = 0; $i -lt $numTrades; $i++) {   
     $index = 0
-    if($useAllCurrencies -eq $True)
-    {
-		$index = (Get-Random -Minimum 0 -Maximum 6)
+    if ($useAllCurrencies -eq $True) {
+        $index = (Get-Random -Minimum 0 -Maximum 6)
     }
     $bidId = createBidForUserFromFixture $index $user1Id
     $askId = createAskForUserFromFixture $index $user2Id
@@ -128,23 +134,19 @@ for ($i = 0; $i -lt $numTrades; $i++)
 $status = "successfully"
 $complete = $False
 
-while(-not($complete))
-{
+while (-not($complete)) {
     Sleep -Seconds 1
 
     $currentTradeCount = (Invoke-RestMethod -Method Get -Uri "${loggerEndpoint}")
-    if ($currentTradeCount -ge $targetTradeCount)
-    {
+    if ($currentTradeCount -ge $targetTradeCount) {
         $complete = $True
     }
-    else 
-    {
+    else {
         $remaining = $targetTradeCount - $currentTradeCount
         log "Remaining trades: ${remaining}"
     }
 
-    if (((get-date) - $startTime).TotalSeconds -gt $completeTimeoutSec)
-    {
+    if (((get-date) - $startTime).TotalSeconds -gt $completeTimeoutSec) {
         log "Timed out. Assume Exchange dropped some trades due to validation. Please retry."
         $status = "unsuccessfully, timed out"
         break

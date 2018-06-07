@@ -31,21 +31,21 @@ Used to set the timeout on the Wait-Job call. If running a large number of trade
 #>
 Param(
     [string]
-    $domain="localhost:19081",
+    $domain = "localhost:19081",
     [int]
-    $numJobs=1,
+    $numJobs = 1,
     [int]
-    $numTradesPerJob=20,
+    $numTradesPerJob = 20,
     [bool]
-    $useAllCurrencies=$False,
+    $useAllCurrencies = $False,
     [int]
-    $requestTimeoutSec=20,
+    $requestTimeoutSec = 20,
     [int]
-    $completeTimeoutSec=900,
+    $completeTimeoutSec = 900,
     [int]
-    $waitJobTimeout=600,
-	[bool]
-	$isSingleton=$True
+    $waitJobTimeout = 600,
+    [bool]
+    $isSingleton = $True
 )
 
 $ErrorActionPreference = "Stop";
@@ -63,54 +63,48 @@ $user2Fixture = ".\fixtures\user2.json"
 $orderFixturePrefix = ".\fixtures\order"
 $orderFixtureSuffix = "json"
 
-function log
-{
+function log {
     Param ([string] $message)
     $time = (Get-Date).ToString('MM/dd/yyyy hh:mm:ss tt')
     Write-Host "[${time}] ${message}"
 }
 
-function createUserFromFixture($fixturePath)
-{
+function createUserFromFixture($fixturePath) {
     $user = (Get-Content $fixturePath | Out-String)
     $userId = Invoke-RestMethod -Method Post -Uri $usersEndpoint -Body $user -ContentType "application/json" -TimeoutSec $requestTimeoutSec
     log "Created user ${userId} from ${fixturePath}"
     return $userId
 }
 
-function createAskForUserFromFixture($index, $userId)
-{
+function createAskForUserFromFixture($index, $userId) {
     $fixturePath = "${orderFixturePrefix}.${index}.${orderFixtureSuffix}"
     $order = (Get-Content $fixturePath | Out-String | ConvertFrom-Json)
     $order.userId = $userId
-	$currencyPair = $order.pair
+    $currencyPair = $order.pair
     $orderJSON = ($order | ConvertTo-Json)
     $askOrderId = Invoke-RestMethod -Method Post -Uri "${askEndpoint}/${currencyPair}" -Body $orderJSON -ContentType "application/json" -TimeoutSec $requestTimeoutSec
     log "Created ask ${askOrderId} from ${fixturePath}"
     return $askOrderId
 }
 
-function createBidForUserFromFixture($index, $userId)
-{
+function createBidForUserFromFixture($index, $userId) {
     $fixturePath = "${orderFixturePrefix}.${index}.${orderFixtureSuffix}"
     $order = (Get-Content $fixturePath | Out-String | ConvertFrom-Json)
     $order.userId = $userId
-	$currencyPair = $order.pair
+    $currencyPair = $order.pair
     $orderJSON = ($order | ConvertTo-Json)
     $bidOrderId = Invoke-RestMethod -Method Post -Uri "${bidEndpoint}/${currencyPair}" -Body $orderJSON -ContentType "application/json" -TimeoutSec $requestTimeoutSec
     log "Created bid ${bidOrderId} from ${fixturePath}"
     return $bidOrderId
 }
 
-if (($useAllCurrencies -eq $False) -and ($isSingleton -eq $False))
-{
-	log "Error: Invalid configuration"
-	log "Reason: If you have a partitioned service, you must use ensure the 'useAllCurrencies' parameter is set to True!"
-	exit
+if (($useAllCurrencies -eq $False) -and ($isSingleton -eq $False)) {
+    log "Error: Invalid configuration"
+    log "Reason: If you have a partitioned service, you must use ensure the 'useAllCurrencies' parameter is set to True!"
+    exit
 }
-if ($isSingleton -eq $True)
-{
-	log "Info: If your OrderBook service is partitioned, please ensure the configuration value 'isSingleton' is set to False!"
+if ($isSingleton -eq $True) {
+    log "Info: If your OrderBook service is partitioned, please ensure the configuration value 'isSingleton' is set to False!"
 }
 
 $startTime = $(get-date)
@@ -122,105 +116,146 @@ $initialTradeCount = (Invoke-RestMethod -Method Get -Uri "${loggerEndpoint}")
 $totalTrades = ($numJobs * $numTradesPerJob)
 $targetTradeCount = $initialTradeCount + $totalTrades
 
-for ($i = 0; $i -lt $numJobs; $i++)
-{
-	$jobNum = $i + 1;
-    Write-Host "Creating Job ${jobNum}/${numJobs}";
+$jobs = @()
 
-    Start-Job -Name "Job-${i}" -ScriptBlock {
+for ($i = 0; $i -lt $numJobs; $i++) {
+    $jobNum = $i + 1;
+    log "Creating Job ${jobNum}/${numJobs}";
+
+    $jobs += Start-Job -Name "Job-${i}" -ScriptBlock {
 
         param([int]$numTradesPerJob, [bool] $useAllCurrencies, 
-        [string] $user1Id, [string] $user2Id, 
-        [string]$usersEndpoint, [int]$requestTimeoutSec, 
-        [string]$askEndpoint, [string] $orderFixturePrefix, 
-        [string] $orderFixtureSuffix,
-        [string] $bidEndpoint,
-        [string] $path)
+            [string] $user1Id, [string] $user2Id, 
+            [string]$usersEndpoint, [int]$requestTimeoutSec, 
+            [string]$askEndpoint, [string] $orderFixturePrefix, 
+            [string] $orderFixtureSuffix,
+            [string] $bidEndpoint,
+            [string] $path)
 
         $ErrorActionPreference = "Stop";
 
-        function log
-        {
+        function log {
             Param ([string] $message)
             $time = (Get-Date).ToString('MM/dd/yyyy hh:mm:ss tt')
             Write-Host "[${time}] ${message}"
         }
 
-        function createAskForUserFromFixture($index, $userId)
-        {
+        function createAskForUserFromFixture($index, $userId) {
             $fixturePath = "${orderFixturePrefix}.${index}.${orderFixtureSuffix}"
             $order = (Get-Content $fixturePath | Out-String | ConvertFrom-Json)
             $order.userId = $userId
-	        $currencyPair = $order.pair
+            $currencyPair = $order.pair
             $orderJSON = ($order | ConvertTo-Json)
-            $askOrderId = Invoke-RestMethod -Method Post -Uri "${askEndpoint}/${currencyPair}" -Body $orderJSON -ContentType "application/json" -TimeoutSec $requestTimeoutSec
+            $askOrderId = $null
+            try {
+                $askOrderId = Invoke-RestMethod -Method Post -Uri "${askEndpoint}/${currencyPair}" -Body $orderJSON -ContentType "application/json" -TimeoutSec $requestTimeoutSec
+            }
+            Catch {
+                $error = $_
+                log "Error creating ask: ${error}"
+                throw $error
+            }
             log "Created ask ${askOrderId} from ${fixturePath}"
             return $askOrderId
         }
 
-        function createBidForUserFromFixture($index, $userId)
-        {
+        function createBidForUserFromFixture($index, $userId) {
             $fixturePath = "${orderFixturePrefix}.${index}.${orderFixtureSuffix}"
             $order = (Get-Content $fixturePath | Out-String | ConvertFrom-Json)
             $order.userId = $userId
-	        $currencyPair = $order.pair
+            $currencyPair = $order.pair
             $orderJSON = ($order | ConvertTo-Json)
-            $bidOrderId = Invoke-RestMethod -Method Post -Uri "${bidEndpoint}/${currencyPair}" -Body $orderJSON -ContentType "application/json" -TimeoutSec $requestTimeoutSec
+            $bidOrderId = $null
+            try {
+                $bidOrderId = Invoke-RestMethod -Method Post -Uri "${bidEndpoint}/${currencyPair}" -Body $orderJSON -ContentType "application/json" -TimeoutSec $requestTimeoutSec
+            }
+            Catch {
+                $error = $_
+                log "Error creating bid: ${error}"
+                throw $error
+            }
             log "Created bid ${bidOrderId} from ${fixturePath}"
             return $bidOrderId
         }
 
         Set-Location -Path $path
-        for ($i = 0; $i -lt $numTradesPerJob; $i++)
-        {   
+        log "========= Job Start ========="
+        for ($i = 0; $i -lt $numTradesPerJob; $i++) {   
             $index = 0
-            if($useAllCurrencies -eq $True)
-            {
-		        $index = (Get-Random -Minimum 0 -Maximum 6)
+            if ($useAllCurrencies -eq $True) {
+                $index = (Get-Random -Minimum 0 -Maximum 6)
             }
             $bidId = createBidForUserFromFixture $index $user1Id
             $askId = createAskForUserFromFixture $index $user2Id
         }
-    } -ArgumentList ($numTradesPerJob,$useAllCurrencies,$user1Id,$user2Id, $usersEndpoint, $requestTimeoutSec, $askEndpoint, $orderFixturePrefix, $orderFixtureSuffix, $bidEndpoint,  (Get-Location).Path ) 
-       
+        log "========= Job End ========="
+    } -ArgumentList ($numTradesPerJob, $useAllCurrencies, $user1Id, $user2Id, $usersEndpoint, $requestTimeoutSec, $askEndpoint, $orderFixturePrefix, $orderFixtureSuffix, $bidEndpoint, (Get-Location).Path )    
 }
 
-Try
-{
+log "Running jobs, please wait..."
+
+$terminate = $false
+
+Try {
     # Wait for all jobs
-    Get-Job | Wait-Job -TimeoutSec $waitJobTimeout
+    Wait-Job $jobs -TimeoutSec $waitJobTimeout | Out-Null
 
-    # Get all jobs
-    Get-Job | Receive-Job | Out-GridView
+    foreach ($job in $jobs) {
+        switch($job.State){
+            "Completed" {
+                log "Job $(${job.id}) ran to completion"
+                if($job.ChildJobs[0].Error)         
+                {           
+                    log "Non terminating errors"            
+                    log $job.ChildJobs[0].Error
+                    $terminate = $true       
+                } else {
+                    log (Receive-Job $job)
+                }       
+            }
+            "Failed" {
+                $terminate = $true
+                log "Job $(${job.id}) terminated with error"
+                Try {
+                    Receive-Job $job -ErrorAction Stop
+                } Catch {
+                    log $_.exception.message
+                }
+            }
+            "Running" {
+                log "Job $(${job.id}) is still running, forcefully stopping it"
+                $job.StopJob()
+            }
+        }
+    }
 }
-Finally
-{
+Finally {
     # Remove all jobs
     Get-Job | Remove-Job -Force
 }
 
-log "All Jobs complete"
+log "All Jobs finished"
+if ($terminate) {
+    log "Script errored, terminating early."
+    exit
+}
 
 $status = "successfully"
 $complete = $False
 
-while(-not($complete))
-{
+while (-not($complete)) {
     sleep -seconds 1
 
     $currenttradecount = (invoke-restmethod -method get -uri "${loggerendpoint}")
-    if ($currenttradecount -ge $targettradecount)
-    {
+    if ($currenttradecount -ge $targettradecount) {
         $complete = $true
     }
-    else 
-    {
+    else {
         $remaining = $targettradecount - $currenttradecount
         log "Remaining trades: ${remaining}"
     }
 
-    if (((get-date) - $starttime).totalseconds -gt $completetimeoutsec)
-    {
+    if (((get-date) - $starttime).totalseconds -gt $completetimeoutsec) {
         log "Timed out. Assume Exchange dropped some trades due to validation. Please retry."
         $status = "unsuccessfully, timed out"
         break
