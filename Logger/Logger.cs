@@ -177,13 +177,17 @@ namespace Logger
                             }
                         }
                     }
-                    catch (LoggerDisconnectedException)
+                    catch (LoggerDisconnectedException ex)
                     {
-                        // Logger may have lost connection
-                        // Back off and retry connection
-                        await BackOff(cancellationToken);
-                        Init(); // reinitialize connection
-                        continue;
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Logger failed connecting to data store {ex.ToString()}");
+                        throw;
+                    }
+                    catch (InsertFailedException ex)
+                    {
+                        // Insert failed, assume connection problem and transient.
+                        // backoff and retry
+                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Logger error,  {ex.Message}");
+                        throw;
                     }
                     catch (FabricNotPrimaryException)
                     {
@@ -196,14 +200,6 @@ namespace Logger
                     {
                         // Fabric is not yet readable - this is a transient exception
                         // Backing off temporarily before retrying
-                        await BackOff(cancellationToken);
-                        continue;
-                    }
-                    catch (InsertFailedException ex)
-                    {
-                        // Insert failed, assume connection problem and transient.
-                        // backoff and retry
-                        ServiceEventSource.Current.ServiceMessage(this.Context, $"Logger error,  {ex.Message}");
                         await BackOff(cancellationToken);
                         continue;
                     }
